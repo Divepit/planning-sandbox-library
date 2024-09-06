@@ -29,7 +29,7 @@ except ValueError:
 # Function to determine safe number of environments
 def get_safe_num_envs():
     soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
-    return min(128, max(32, soft // 16))  # Further reduced max environments
+    return min(64, max(16, soft // 32))  # Further reduced max environments
 
 class EarlyStoppingCallback(BaseCallback):
     def __init__(self, verbose=0):
@@ -67,7 +67,7 @@ def make_env(rank, num_agents, num_goals, num_obstacles, width, height, num_skil
 class MixedPrecisionPPO(PPO):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.scaler = amp.GradScaler(device_type='cuda' if self.device.type == 'cuda' else 'cpu')
+        self.scaler = amp.GradScaler()
 
     def train(self) -> None:
         """
@@ -103,7 +103,7 @@ class MixedPrecisionPPO(PPO):
                 if self.use_sde:
                     self.policy.reset_noise(self.batch_size)
 
-                with amp.autocast(device_type='cuda' if self.device.type == 'cuda' else 'cpu'):
+                with amp.autocast():
                     values, log_prob, entropy = self.policy.evaluate_actions(rollout_data.observations, actions)
                     values = values.flatten()
                     # Normalize advantage
