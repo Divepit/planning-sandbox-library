@@ -70,7 +70,7 @@ class RLEnv(gym.Env):
         super().reset(seed=seed)
         self.episode_reward = 0
         self.step_count = 0
-        self.sandboxEnv = copy.deepcopy(self.initial_env)
+        self.sandboxEnv._reset_environment()
         return self._get_obs(), {}
     
     def _update_obs_values(self):

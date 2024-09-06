@@ -49,6 +49,21 @@ class Environment:
             self.grid_map.add_occupied_position(goal.position)
             self.goals.append(goal)
 
+    def _reset_environment(self):
+        self.grid_map = GridMap(self.width, self.height, self.num_obstacles)
+        self.obstacles = self.grid_map.obstacles
+
+        self.agents = []
+        self.goals = []
+
+        self._initialize_agents()
+        self._initialize_goals()
+        self._initialize_skills()
+
+        self.controller = Controller(self.agents, self.grid_map)
+        self.planner = Planner(self.agents, self.grid_map)
+        self.scheduler = Scheduler(self.agents, self.goals)
+
     def _initialize_skills(self):
         # assign 1 or 2 skills to each goal
         # assign 1 to num_skills skills to each agent
