@@ -10,6 +10,20 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
 from stable_baselines3 import PPO
 from stable_baselines3.common.utils import get_schedule_fn
+import resource
+
+# Try to increase the limit of open files
+soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+try:
+    resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+    print(f"Increased file limit from {soft} to {hard}")
+except ValueError:
+    print(f"Unable to increase file limit. Current limit: {soft}")
+
+# Function to determine safe number of environments
+def get_safe_num_envs():
+    soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
+    return min(1024, max(64, soft // 4))  # Use at most 1/4 of available file descriptors, between 64 and 1024
 
 class EarlyStoppingCallback(BaseCallback):
     def __init__(self, verbose=0):
@@ -61,8 +75,9 @@ if __name__ == "__main__":
     num_skills = 2
     max_steps = width * height
 
-    # Increase number of environments
-    num_envs = 1024  # Adjust based on your GPU's memory
+    # Determine safe number of environments
+    num_envs = get_safe_num_envs()
+    print(f"Using {num_envs} environments")
 
     env = SubprocVecEnv([make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, width=width, height=height, num_skills=num_skills) for i in range(num_envs)])
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=10.)
@@ -75,10 +90,10 @@ if __name__ == "__main__":
         "MlpPolicy",
         env,
         verbose=1,
-        n_steps=2048,  # Increased from max_steps
-        batch_size=65536,  # Increased batch size
-        n_epochs=10,  # Increased from 6
-        learning_rate=1e-4,  # Adjusted learning rate
+        n_steps=2048,
+        batch_size=min(65536, num_envs * max_steps),  # Adjust batch size based on num_envs
+        n_epochs=10,
+        learning_rate=1e-4,
         clip_range=0.2,
         ent_coef=0.01,
         policy_kwargs = dict(
