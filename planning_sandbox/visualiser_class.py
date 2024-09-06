@@ -91,9 +91,6 @@ class Visualizer:
         while not done:
             if i >= iterations:
                 break
-            
-            if iterations > 1:
-                print("Iterations left: ", iterations - i)
 
             self.screen.fill(WHITE)
             self.draw_grid()

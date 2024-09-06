@@ -69,14 +69,12 @@ class Environment:
         self.scheduler.reset()
 
         self._initialize_skills()
-        print("Reset environment")
 
     def _initialize_skills(self):
         # assign 1 or 2 skills to each goal
         # assign 1 to num_skills skills to each agent
         # ensure that no goal has the same skill twice and no agent has the same skill twice
         if self.num_skills == 1:
-            print("No skills")
             for goal in self.goals:
                 goal.add_skill(0)
             for agent in self.agents:
@@ -92,7 +90,6 @@ class Environment:
                     skill = np.random.randint(0, self.num_skills)
                 skills.append(skill)
             goal.required_skills = skills
-            print(f"Goal at {goal.position} requires skills {skills}")
                 
         for agent in self.agents:
             amount_of_skills = np.random.randint(1, self.num_skills+1)
@@ -103,7 +100,6 @@ class Environment:
                     skill = np.random.randint(0, self.num_skills)
                 skills.append(skill)
             agent.skills = skills
-            print(f"Agent at {agent.position} has skills {skills}")
 
     def get_normalized_skill_vectors_for_all_agents(self):
         normalized_skill_vectors = []
