@@ -67,6 +67,7 @@ class Environment:
 
         self.planner.reset()
         self.scheduler.reset()
+        self.controller.reset()
 
         self._initialize_skills()
 
