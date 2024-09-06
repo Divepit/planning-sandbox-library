@@ -60,7 +60,7 @@ if __name__ == "__main__":
     num_obstacles = 0
     width = 8
     height = 8
-    num_skills = 4
+    num_skills = 2
     max_steps = width * height
 
 

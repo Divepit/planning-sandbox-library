@@ -60,7 +60,9 @@ class Scheduler:
     def _goal_can_be_claimed(self, goal):
         skills_of_agents_present = self._get_skills_of_agents_present_at_goal(goal)
         skills_required = goal.required_skills
-        return all([skill in skills_of_agents_present for skill in skills_required])
+        for skill in skills_required:
+            if skill not in skills_of_agents_present:
+                return False
     
     def _update_goal_status(self, goal):
         if self._goal_can_be_claimed(goal):

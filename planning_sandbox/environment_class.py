@@ -64,10 +64,12 @@ class Environment:
             goal.reset(self.grid_map.random_valid_position())
             self.grid_map.add_occupied_position(goal.position)
 
-        self._initialize_skills()
 
         self.planner.reset()
         self.scheduler.reset()
+
+        self._initialize_skills()
+        print("Reset environment")
 
     def _initialize_skills(self):
         # assign 1 or 2 skills to each goal
@@ -82,17 +84,26 @@ class Environment:
             return
 
         for goal in self.goals:
-            for _ in range(np.random.randint(0, min(2, self.num_skills))):
+            amount_of_skills = np.random.randint(1, self.num_skills+1)
+            skills = []
+            for _ in range(amount_of_skills):
                 skill = np.random.randint(0, self.num_skills)
-                while skill in goal.required_skills:
+                while skill in skills:
                     skill = np.random.randint(0, self.num_skills)
-                goal.add_skill(skill)
+                skills.append(skill)
+            goal.required_skills = skills
+            print(f"Goal at {goal.position} requires skills {skills}")
+                
         for agent in self.agents:
-            for _ in range(np.random.randint(1, self.num_skills)):
+            amount_of_skills = np.random.randint(1, self.num_skills+1)
+            skills = []
+            for _ in range(amount_of_skills):
                 skill = np.random.randint(0, self.num_skills)
-                while skill in agent.skills:
+                while skill in skills:
                     skill = np.random.randint(0, self.num_skills)
-                agent.add_skill(skill)
+                skills.append(skill)
+            agent.skills = skills
+            print(f"Agent at {agent.position} has skills {skills}")
 
     def get_normalized_skill_vectors_for_all_agents(self):
         normalized_skill_vectors = []
