@@ -76,9 +76,9 @@ if __name__ == "__main__":
         verbose=1,
         n_steps=max_steps,
         batch_size=max_steps*num_envs,
-        n_epochs=6,
+        n_epochs=10,
         learning_rate=linear_schedule(5e-6),
-        clip_range=0.4,
+        clip_range=0.8,
         ent_coef=0.05,
         policy_kwargs = dict(
             net_arch=dict(pi=[512, 512, 512], vf=[256, 256]),
