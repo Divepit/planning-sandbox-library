@@ -3,28 +3,33 @@ import signal
 import torch
 import torch.cuda.amp as amp
 import numpy as np
+import gymnasium as gym
 from RL_mover_env import RLEnv
 from planning_sandbox.environment_class import Environment
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.utils import set_random_seed
+from stable_baselines3.common.utils import set_random_seed, explained_variance
 from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
 from stable_baselines3 import PPO
 from stable_baselines3.common.utils import get_schedule_fn
 import resource
 from tqdm import tqdm
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Try to increase the limit of open files
 soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
 try:
     resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
-    print(f"Increased file limit from {soft} to {hard}")
+    logging.info(f"Increased file limit from {soft} to {hard}")
 except ValueError:
-    print(f"Unable to increase file limit. Current limit: {soft}")
+    logging.warning(f"Unable to increase file limit. Current limit: {soft}")
 
 # Function to determine safe number of environments
 def get_safe_num_envs():
     soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
-    return min(256, max(64, soft // 8))  # Reduced max environments to 256
+    return min(128, max(32, soft // 16))  # Further reduced max environments
 
 class EarlyStoppingCallback(BaseCallback):
     def __init__(self, verbose=0):
@@ -33,7 +38,7 @@ class EarlyStoppingCallback(BaseCallback):
         signal.signal(signal.SIGINT, self.signal_handler)
 
     def signal_handler(self, sig, frame):
-        print("\nEarly stopping initiated. Completing the current update...")
+        logging.info("\nEarly stopping initiated. Completing the current update...")
         self.should_stop = True
 
     def _on_step(self) -> bool:
@@ -62,7 +67,7 @@ def make_env(rank, num_agents, num_goals, num_obstacles, width, height, num_skil
 class MixedPrecisionPPO(PPO):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.scaler = amp.GradScaler(enabled=(self.device.type == 'cuda'))
+        self.scaler = amp.GradScaler(device_type='cuda' if self.device.type == 'cuda' else 'cpu')
 
     def train(self) -> None:
         """
@@ -98,7 +103,7 @@ class MixedPrecisionPPO(PPO):
                 if self.use_sde:
                     self.policy.reset_noise(self.batch_size)
 
-                with amp.autocast(enabled=(self.device.type == 'cuda')):
+                with amp.autocast(device_type='cuda' if self.device.type == 'cuda' else 'cpu'):
                     values, log_prob, entropy = self.policy.evaluate_actions(rollout_data.observations, actions)
                     values = values.flatten()
                     # Normalize advantage
@@ -177,16 +182,12 @@ class MixedPrecisionPPO(PPO):
         if self.clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
 
-    def learn(self, *args, **kwargs):
-        return super().learn(*args, **kwargs)
-
 if __name__ == "__main__":
-    # CUDA settings
     torch.backends.cudnn.benchmark = True
     torch.cuda.empty_cache()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    logging.info(f"Using device: {device}")
 
     # Environment parameters
     num_agents = 3
@@ -197,46 +198,41 @@ if __name__ == "__main__":
     num_skills = 2
     max_steps = width * height
 
-    # Determine safe number of environments
     num_envs = get_safe_num_envs()
-    print(f"Initializing {num_envs} environments...")
+    logging.info(f"Initializing {num_envs} environments...")
 
-    # Create environments with progress bar
-    envs = []
-    for i in tqdm(range(num_envs), desc="Creating environments"):
-        envs.append(make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, width=width, height=height, num_skills=num_skills))
+    envs = [make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, width=width, height=height, num_skills=num_skills) for i in range(num_envs)]
 
-    print("Initializing SubprocVecEnv...")
+    logging.info("Initializing SubprocVecEnv...")
     env = SubprocVecEnv(envs)
-    print("Initializing VecNormalize...")
+    logging.info("Initializing VecNormalize...")
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=10.)
 
     log_dir = "./logs"
     os.makedirs(log_dir, exist_ok=True)
 
-    print("Setting up PPO model...")
-    # PPO model setup with optimizations
+    logging.info("Setting up PPO model...")
     model = MixedPrecisionPPO(
         "MlpPolicy",
         env,
         verbose=1,
         n_steps=2048,
-        batch_size=min(65536, num_envs * max_steps),  # Adjust batch size based on num_envs
-        n_epochs=100,
+        batch_size=min(32768, num_envs * max_steps),  # Reduced batch size
+        n_epochs=10,
         learning_rate=1e-4,
         clip_range=0.2,
         ent_coef=0.01,
         policy_kwargs = dict(
-            net_arch=dict(pi=[512, 512], vf=[512, 512]),
+            net_arch=dict(pi=[256, 256], vf=[256, 256]),  # Reduced network size
             activation_fn=torch.nn.ReLU
         ),
         device=device,
         tensorboard_log=log_dir,
     )
 
-    total_timesteps = 100000000  # Increased total timesteps
+    total_timesteps = 50000000  # Reduced total timesteps
 
-    print("Starting training...")
+    logging.info("Starting training...")
     try:
         model.learn(
             total_timesteps=total_timesteps,
@@ -244,9 +240,9 @@ if __name__ == "__main__":
             progress_bar=True
         )
     except KeyboardInterrupt:
-        print("\nTraining interrupted. Saving the model...")
+        logging.info("\nTraining interrupted. Saving the model...")
     except Exception as e:
-        print(f"An error occurred during training: {e}")
+        logging.error(f"An error occurred during training: {e}", exc_info=True)
     finally:
         model.save("ppo_custom_env_optimized_gpu")
-        print("Training completed and model saved.")
+        logging.info("Training completed and model saved.")
