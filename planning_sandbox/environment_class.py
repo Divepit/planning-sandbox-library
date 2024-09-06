@@ -11,7 +11,7 @@ from planning_sandbox.planner_class import Planner
 import numpy as np
 
 class Environment:
-    def __init__(self, width, height, num_agents, num_goals, num_obstacles, num_skills=1):
+    def __init__(self, width, height, num_agents, num_goals, num_obstacles, num_skills):
         self.width = width
         self.height = height
 
@@ -57,10 +57,14 @@ class Environment:
         self.grid_map.reset()
         
         for agent in self.agents:
-            agent.reset()
+            agent.reset(self.grid_map.random_valid_position())
+            self.grid_map.add_occupied_position(agent.position)
 
         for goal in self.goals:
-            goal.reset()
+            goal.reset(self.grid_map.random_valid_position())
+            self.grid_map.add_occupied_position(goal.position)
+
+        self._initialize_skills()
 
         self.planner.reset()
         self.scheduler.reset()

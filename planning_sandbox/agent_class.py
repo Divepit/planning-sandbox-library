@@ -5,8 +5,12 @@ class Agent:
         self.position = initial_position
         self.skills = []
 
-    def reset(self):
-        self.position = self.initial_position
+    def reset(self, position=None):
+        if position is not None:
+            self.position = position
+        else:
+            self.position = self.initial_position
+        self.skills = []
 
     def move_left(self):
         self.position = (self.position[0] - 1, self.position[1])

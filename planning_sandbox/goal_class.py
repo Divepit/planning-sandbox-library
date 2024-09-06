@@ -17,5 +17,9 @@ class Goal:
     def claim(self):
         self.claimed = True 
 
-    def reset(self):
+    def reset(self, position=None):
         self.claimed = False
+        self.required_skills = []
+        if position is not None:
+            self.position = position
+
