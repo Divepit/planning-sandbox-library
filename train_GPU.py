@@ -218,7 +218,7 @@ if __name__ == "__main__":
         verbose=1,
         n_steps=2048,
         batch_size=min(32768, num_envs * max_steps),  # Reduced batch size
-        n_epochs=10,
+        n_epochs=48,
         learning_rate=1e-4,
         clip_range=0.2,
         ent_coef=0.01,
