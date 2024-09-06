@@ -15,6 +15,11 @@ import resource
 from tqdm import tqdm
 import logging
 
+def linear_schedule(initial_value: float):
+    def func(progress_remaining: float) -> float:
+        return progress_remaining * initial_value
+    return func
+
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -219,7 +224,7 @@ if __name__ == "__main__":
         n_steps=2048,
         batch_size=min(32768, num_envs * max_steps),  # Reduced batch size
         n_epochs=48,
-        learning_rate=1e-4,
+        learning_rate=linear_schedule(1e-5),
         clip_range=0.2,
         ent_coef=0.01,
         policy_kwargs = dict(
