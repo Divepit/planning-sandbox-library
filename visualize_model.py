@@ -19,7 +19,7 @@ num_goals = 3
 num_obstacles = 0
 width = 8
 height = 8
-num_skills = 2
+num_skills = 4
 
 sandboxEnv = Environment(width=width, height=height, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
 RLenv = RLEnv(sandboxEnv)

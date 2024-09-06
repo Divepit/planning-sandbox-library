@@ -1,6 +1,8 @@
 import os
 import signal
 import torch
+from torch.nn.parallel import DataParallel
+import numpy as np
 from RL_mover_env import RLEnv
 from planning_sandbox.environment_class import Environment
 from stable_baselines3.common.callbacks import BaseCallback
@@ -12,8 +14,6 @@ def linear_schedule(initial_value: float):
     def func(progress_remaining: float) -> float:
         return progress_remaining * initial_value
     return func
-
-
 
 class EarlyStoppingCallback(BaseCallback):
     def __init__(self, verbose=0):
@@ -49,20 +49,25 @@ def make_env(rank, num_agents, num_goals, num_obstacles, width, height, num_skil
     return _init
 
 if __name__ == "__main__":
+    # Check available GPUs
+    num_gpus = torch.cuda.device_count()
+    print(f"Number of available GPUs: {num_gpus}")
+
+    # Use CUDA if available, otherwise CPU
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    num_envs = 12
-    print(f"Number of environments: {num_envs}")
-
+    # Environment parameters
     num_agents = 3
     num_goals = 3
     num_obstacles = 0
     width = 8
     height = 8
-    num_skills = 4
+    num_skills = 2
     max_steps = width * height
 
+    # Increase number of environments based on your machine's capability
+    num_envs = 128 * num_gpus  # Adjust this based on your machine's memory and CPU cores
 
     env = SubprocVecEnv([make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, width=width, height=height, num_skills=num_skills) for i in range(num_envs)])
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=10.)
@@ -70,12 +75,13 @@ if __name__ == "__main__":
     log_dir = "./logs"
     os.makedirs(log_dir, exist_ok=True)
 
+    # PPO model setup
     model = PPO(
         "MlpPolicy",
         env,
         verbose=1,
         n_steps=max_steps,
-        batch_size=max_steps*num_envs,
+        batch_size=max_steps * num_envs // num_gpus,  # Adjust batch size for multiple GPUs
         n_epochs=6,
         learning_rate=linear_schedule(5e-6),
         clip_range=0.4,
@@ -88,7 +94,13 @@ if __name__ == "__main__":
         tensorboard_log=log_dir,
     )
 
-    total_timesteps = 50000000
+    # Wrap the policy with DataParallel for multi-GPU training
+    if num_gpus > 1:
+        model.policy.mlp_extractor = DataParallel(model.policy.mlp_extractor)
+        model.policy.action_net = DataParallel(model.policy.action_net)
+        model.policy.value_net = DataParallel(model.policy.value_net)
+
+    total_timesteps = 50000000 * num_gpus  # Scale with number of GPUs
 
     try:
         model.learn(
@@ -101,5 +113,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"An error occurred during training: {e}")
     finally:
-        model.save("ppo_custom_env_improved_goal_assignment")
+        model.save("ppo_custom_env_multi_gpu")
         print("Training completed and model saved.")
