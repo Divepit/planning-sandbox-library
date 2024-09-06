@@ -38,7 +38,8 @@ class RLEnv(gym.Env):
 
         for i, agent in enumerate(self.sandboxEnv.agents):
             agent_action = self.sandboxEnv.controller.action_map[actions[i]]
-            if agent_action in self.sandboxEnv.controller.get_valid_actions(agent):
+            action_is_valid = self.sandboxEnv.controller.validate_action(agent, agent_action)
+            if action_is_valid:
                 if agent_action == 0:
                     reward -= 0.25
                 agent.apply_action(agent_action)

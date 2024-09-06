@@ -55,6 +55,7 @@ class Environment:
     def reset(self):
 
         self.grid_map.reset()
+        # print("Obstacles reset: ", self.grid_map.obstacles)
         
         for agent in self.agents:
             agent.reset(self.grid_map.random_valid_position())

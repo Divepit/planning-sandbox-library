@@ -10,7 +10,7 @@ class Agent:
             self.position = position
         else:
             self.position = self.initial_position
-        self.skills = []
+        self.skills.clear()
 
     def move_left(self):
         self.position = (self.position[0] - 1, self.position[1])

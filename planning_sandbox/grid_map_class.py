@@ -8,13 +8,13 @@ class GridMap:
         self.num_obstacles = num_obstacles
         self.obstacles = []
         self.occupied_positions = []
-
         self.graph = None
         self.generate_connected_grid_with_obstalces(self.num_obstacles)
-    
+
+
     def reset(self):
-        self.obstacles = []
-        self.occupied_positions = []
+        self.obstacles.clear()
+        self.occupied_positions.clear()
         self.graph = None
         self.generate_connected_grid_with_obstalces(self.num_obstacles)
 
@@ -54,9 +54,10 @@ class GridMap:
     def generate_connected_grid_with_obstalces(self, num_obstacles):
         while True:
             self.graph = nx.grid_2d_graph(self.width, self.height)
-            self.obstacles = []
+            self.obstacles.clear()
             self.generate_random_obstacles(num_obstacles)
             if nx.is_connected(self.graph):
+                print("Obstacles: ", self.obstacles)
                 break
 
     def get_grid(self):
