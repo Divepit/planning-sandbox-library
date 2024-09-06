@@ -56,6 +56,8 @@ class RLEnv(gym.Env):
                 if not goal.claimed:
                     reward -= 5
         
+        reward -= 0.25
+
         self.episode_reward += reward
 
         if done:
@@ -81,13 +83,15 @@ class RLEnv(gym.Env):
         self.normalized_agent_positions = self.sandboxEnv.grid_map.get_normalized_positions([agent.position for agent in self.sandboxEnv.agents])
         self.normalized_agent_skill_vectors = self.sandboxEnv.get_normalized_skill_vectors_for_all_agents()
         self.normalized_claimed_goals_vector = self.sandboxEnv.scheduler._get_normalized_claimed_goals()
+        self.normalized_step_count = self.step_count / self.max_steps
 
         self.obs_size = (2*len(self.normalized_obstacle_positions) +
                         2*len(self.normalized_goal_positions) +
                         self.sandboxEnv.num_skills*len(self.normalized_goal_skill_vectors) +
                         2*len(self.normalized_agent_positions) +
                         self.sandboxEnv.num_skills*len(self.normalized_agent_skill_vectors) +
-                        len(self.normalized_claimed_goals_vector))
+                        len(self.normalized_claimed_goals_vector) +
+                        1)
         
         self.observation_space = gym.spaces.Box(low=0, high=1, shape=(self.obs_size,), dtype=np.float32)
 
@@ -126,6 +130,9 @@ class RLEnv(gym.Env):
         for i, claimed in enumerate(self.normalized_claimed_goals_vector):
             obs[i + offset] = claimed
             offset += 1
+
+        obs[offset] = self.normalized_step_count
+        offset += 1
         
 
 
