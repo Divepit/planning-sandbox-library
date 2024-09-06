@@ -191,11 +191,11 @@ if __name__ == "__main__":
 
     # Environment parameters
     num_agents = 3
-    num_goals = 3
-    num_obstacles = 0
-    width = 8
-    height = 8
-    num_skills = 2
+    num_goals = 5
+    num_obstacles = 10
+    width = 12
+    height = 12
+    num_skills = 3
     max_steps = width * height
 
     num_envs = get_safe_num_envs()

@@ -87,9 +87,9 @@ class RLEnv(gym.Env):
 
         self.obs_size = (2*len(self.normalized_obstacle_positions) +
                         2*len(self.normalized_goal_positions) +
-                        self.sandboxEnv.num_skills*len(self.normalized_goal_skill_vectors) +
+                        (self.sandboxEnv.num_skills+1)*len(self.normalized_goal_skill_vectors) +
                         2*len(self.normalized_agent_positions) +
-                        self.sandboxEnv.num_skills*len(self.normalized_agent_skill_vectors) +
+                        (self.sandboxEnv.num_skills+1)*len(self.normalized_agent_skill_vectors) +
                         len(self.normalized_claimed_goals_vector) +
                         1)
         
