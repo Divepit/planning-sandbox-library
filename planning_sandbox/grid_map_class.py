@@ -51,6 +51,7 @@ class GridMap:
             self.add_obstacle(pos)
 
     def generate_connected_grid_with_obstalces(self, num_obstacles):
+        print("Generating connected grid with obstacles")
         while True:
             self.graph = nx.grid_2d_graph(self.width, self.height)
             self.obstacles = []
