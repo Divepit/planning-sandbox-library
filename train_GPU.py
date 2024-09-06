@@ -223,7 +223,7 @@ if __name__ == "__main__":
         clip_range=0.2,
         ent_coef=0.01,
         policy_kwargs = dict(
-            net_arch=dict(pi=[256, 256], vf=[256, 256]),  # Reduced network size
+            net_arch=dict(pi=[512, 512, 512, 512], vf=[512, 512, 512]),  # Reduced network size
             activation_fn=torch.nn.ReLU
         ),
         device=device,
