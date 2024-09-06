@@ -52,7 +52,7 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    num_envs = os.cpu_count()
+    num_envs = 12
     print(f"Number of environments: {num_envs}")
 
     num_agents = 3
