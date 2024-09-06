@@ -76,7 +76,7 @@ if __name__ == "__main__":
         verbose=1,
         n_steps=max_steps,
         batch_size=max_steps*num_envs,
-        n_epochs=10,
+        n_epochs=48,
         learning_rate=linear_schedule(5e-6),
         clip_range=0.8,
         ent_coef=0.05,
