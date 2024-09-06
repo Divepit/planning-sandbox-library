@@ -7,6 +7,9 @@ class Scheduler:
         
         self.goal_assignments = {}
 
+    def reset(self):
+        self.goal_assignments = {}
+
     def _assign_goal_to_agent(self, agent, goal):
         self.goal_assignments[agent] = goal
     

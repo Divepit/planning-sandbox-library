@@ -7,6 +7,8 @@ class Planner:
         self.grid_map = grid_map
 
         self.paths = {}
+    def reset(self):
+        self.paths = {}
 
     def generate_shortest_path_for_agent(self, agent, goal):
         start = agent.position

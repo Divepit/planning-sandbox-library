@@ -12,19 +12,29 @@ YELLOW = (255, 255, 0)
 CELL_SIZE = 30
 
 class Visualizer:
-    def __init__(self, width, height, obstacles, agents, goals):
+    def __init__(self, sandboxEnv):
             pygame.init()
-            self.width = width*CELL_SIZE
-            self.height = height*CELL_SIZE
+            self.sandboxEnv = sandboxEnv
+            self.width = sandboxEnv.width*CELL_SIZE
+            self.height = sandboxEnv.height*CELL_SIZE
             self.screen = pygame.display.set_mode((self.width, self.height))
             pygame.display.set_caption("Grid World")
             self.font = pygame.font.Font(None, 24)
 
-            self.agents = agents
-            self.goals = goals
-
-            self.obstacles = obstacles
             self.assignments = {}
+
+
+    @property
+    def agents(self):
+        return self.sandboxEnv.agents
+
+    @property
+    def goals(self):
+        return self.sandboxEnv.goals
+
+    @property
+    def obstacles(self):
+        return self.sandboxEnv.obstacles
 
     def draw_grid(self):
         for x in range(0, self.width, CELL_SIZE):
@@ -46,7 +56,8 @@ class Visualizer:
     def draw_goals(self):
         for i, goal in enumerate(self.goals):
             x, y = goal.position
-            pygame.draw.rect(self.screen, GREEN, (x * CELL_SIZE + CELL_SIZE // 4, y * CELL_SIZE + CELL_SIZE // 4, CELL_SIZE // 2, CELL_SIZE // 2))
+            color = RED if goal.claimed else GREEN
+            pygame.draw.rect(self.screen, color, (x * CELL_SIZE + CELL_SIZE // 4, y * CELL_SIZE + CELL_SIZE // 4, CELL_SIZE // 2, CELL_SIZE // 2))
             text = self.font.render(str(f"{i} {goal.required_skills}"), True, BLACK)
             self.screen.blit(text, (x * CELL_SIZE + CELL_SIZE // 3, y * CELL_SIZE + CELL_SIZE // 3))
 
@@ -71,6 +82,7 @@ class Visualizer:
         self.assignments = assignments
 
     def run_step(self, iterations=1):
+
         done = False
 
         clock = pygame.time.Clock()

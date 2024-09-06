@@ -20,12 +20,11 @@ num_obstacles = 0
 width = 8
 height = 8
 num_skills = 2
-max_steps = width * height
 
 sandboxEnv = Environment(width=width, height=height, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
-
-visualizer = Visualizer(width=sandboxEnv.width, height=sandboxEnv.height, obstacles=sandboxEnv.obstacles, agents=sandboxEnv.agents, goals=sandboxEnv.goals)
 RLenv = RLEnv(sandboxEnv)
+
+visualizer = Visualizer(sandboxEnv)
 RLenv = DummyVecEnv([lambda: RLenv])
 
 
@@ -39,9 +38,10 @@ else:
 done = False
 step = 0
 
-while not done and step < max_steps:
+while not done:
 
     model_action, _ = model.predict(obs, deterministic=False)
+    visualizer.run_step(iterations=2)
     
     # Handle different return types from env.step()
     step_return = RLenv.step(model_action)
@@ -52,21 +52,4 @@ while not done and step < max_steps:
         obs, reward, done, info = step_return
     
     step += 1
-
-    action_vector = model_action[0]
-    actions = model_action[0]
-
-    for i, agent in enumerate(sandboxEnv.agents):
-            agent_action = sandboxEnv.controller.action_map[actions[i]]
-            if agent_action in sandboxEnv.controller.get_valid_actions(agent):
-                agent.apply_action(agent_action)
-                print(f"Agent {i} moved {agent_action}")
-            sandboxEnv.scheduler.update_goal_statuses()
-            claimed_goals = sandboxEnv.scheduler._get_normalized_claimed_goals()
-            print(f"Claimed goals: {claimed_goals}")
-        
-        
-    visualizer.run_step()
-    done = step >= max_steps or sandboxEnv.scheduler.all_goals_claimed()
-    print("Reward: ", reward)
 

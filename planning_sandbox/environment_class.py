@@ -19,22 +19,25 @@ class Environment:
         self.num_goals = num_goals
         self.num_obstacles = num_obstacles
         self.num_skills = num_skills
-        
-        self.agents: List[Agent] = []
-        self.goals: List[Goal] = []
+
 
         self.grid_map = GridMap(width, height, num_obstacles)
         self.obstacles = self.grid_map.obstacles
 
+        self.agents = []
         self._initialize_agents()
+
+
+        self.goals = []
         self._initialize_goals()
-        self._initialize_skills()
 
         self.normalized_skill_map = {i: i / self.num_skills for i in range(self.num_skills)}
-        
+        self._initialize_skills()
+
         self.controller = Controller(self.agents, self.grid_map)
         self.planner = Planner(self.agents, self.grid_map)
         self.scheduler = Scheduler(self.agents, self.goals)
+        
         # self.visualizer = Visualizer(self.width, self.height, self.obstacles)
 
     def _initialize_agents(self):
@@ -49,20 +52,18 @@ class Environment:
             self.grid_map.add_occupied_position(goal.position)
             self.goals.append(goal)
 
-    def _reset_environment(self):
-        self.grid_map = GridMap(self.width, self.height, self.num_obstacles)
-        self.obstacles = self.grid_map.obstacles
+    def reset(self):
 
-        self.agents = []
-        self.goals = []
+        self.grid_map.reset()
+        
+        for agent in self.agents:
+            agent.reset()
 
-        self._initialize_agents()
-        self._initialize_goals()
-        self._initialize_skills()
+        for goal in self.goals:
+            goal.reset()
 
-        self.controller = Controller(self.agents, self.grid_map)
-        self.planner = Planner(self.agents, self.grid_map)
-        self.scheduler = Scheduler(self.agents, self.goals)
+        self.planner.reset()
+        self.scheduler.reset()
 
     def _initialize_skills(self):
         # assign 1 or 2 skills to each goal

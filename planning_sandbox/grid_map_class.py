@@ -5,12 +5,19 @@ class GridMap:
     def __init__(self, width, height, num_obstacles):
         self.width = width
         self.height = height
+        self.num_obstacles = num_obstacles
         self.obstacles = []
         self.occupied_positions = []
 
         self.graph = None
         self.generate_connected_grid_with_obstalces(num_obstacles)
     
+    def reset(self):
+        self.obstacles = []
+        self.occupied_positions = []
+        self.graph = None
+        self.generate_connected_grid_with_obstalces(self.num_obstacles)
+
     def add_obstacle(self, pos):
         self.obstacles.append(pos)
         self.graph.remove_node(pos)

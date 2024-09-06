@@ -24,8 +24,6 @@ class Controller:
             position = (position[0], position[1] - 1)
         elif action == 'down' or action == 4:
             position = (position[0], position[1] + 1)
-        elif action == 'stay' or action == 0:
-            return True
         return self.grid_map.is_valid_position(position)
     
     def get_valid_actions(self, agent):

@@ -37,6 +37,8 @@ class Agent:
             self.move_down()
         elif action == 0 or action == 'stay':
             self.remain_still()
+        else:
+            raise ValueError("Invalid action")
     
     def add_skill(self, skill):
         self.skills.append(skill)

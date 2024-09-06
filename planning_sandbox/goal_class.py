@@ -16,3 +16,6 @@ class Goal:
     
     def claim(self):
         self.claimed = True 
+
+    def reset(self):
+        self.claimed = False
