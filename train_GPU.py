@@ -1,7 +1,7 @@
 import os
 import signal
 import torch
-from torch.nn.parallel import DataParallel
+import torch.cuda.amp as amp
 import numpy as np
 from RL_mover_env import RLEnv
 from planning_sandbox.environment_class import Environment
@@ -9,11 +9,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
 from stable_baselines3 import PPO
-
-def linear_schedule(initial_value: float):
-    def func(progress_remaining: float) -> float:
-        return progress_remaining * initial_value
-    return func
+from stable_baselines3.common.utils import get_schedule_fn
 
 class EarlyStoppingCallback(BaseCallback):
     def __init__(self, verbose=0):
@@ -49,12 +45,11 @@ def make_env(rank, num_agents, num_goals, num_obstacles, width, height, num_skil
     return _init
 
 if __name__ == "__main__":
-    # Check available GPUs
-    num_gpus = torch.cuda.device_count()
-    print(f"Number of available GPUs: {num_gpus}")
+    # CUDA settings
+    torch.backends.cudnn.benchmark = True
+    torch.cuda.empty_cache()
 
-    # Use CUDA if available, otherwise CPU
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     # Environment parameters
@@ -66,8 +61,8 @@ if __name__ == "__main__":
     num_skills = 2
     max_steps = width * height
 
-    # Increase number of environments based on your machine's capability
-    num_envs = 128 * num_gpus  # Adjust this based on your machine's memory and CPU cores
+    # Increase number of environments
+    num_envs = 1024  # Adjust based on your GPU's memory
 
     env = SubprocVecEnv([make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, width=width, height=height, num_skills=num_skills) for i in range(num_envs)])
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=10.)
@@ -75,32 +70,49 @@ if __name__ == "__main__":
     log_dir = "./logs"
     os.makedirs(log_dir, exist_ok=True)
 
-    # PPO model setup
+    # PPO model setup with optimizations
     model = PPO(
         "MlpPolicy",
         env,
         verbose=1,
-        n_steps=max_steps,
-        batch_size=max_steps * num_envs // num_gpus,  # Adjust batch size for multiple GPUs
-        n_epochs=6,
-        learning_rate=linear_schedule(5e-6),
-        clip_range=0.4,
-        ent_coef=0.05,
+        n_steps=2048,  # Increased from max_steps
+        batch_size=65536,  # Increased batch size
+        n_epochs=10,  # Increased from 6
+        learning_rate=1e-4,  # Adjusted learning rate
+        clip_range=0.2,
+        ent_coef=0.01,
         policy_kwargs = dict(
-            net_arch=dict(pi=[512, 512, 512], vf=[256, 256]),
+            net_arch=dict(pi=[512, 512], vf=[512, 512]),
             activation_fn=torch.nn.ReLU
         ),
         device=device,
         tensorboard_log=log_dir,
     )
 
-    # Wrap the policy with DataParallel for multi-GPU training
-    if num_gpus > 1:
-        model.policy.mlp_extractor = DataParallel(model.policy.mlp_extractor)
-        model.policy.action_net = DataParallel(model.policy.action_net)
-        model.policy.value_net = DataParallel(model.policy.value_net)
+    # Enable mixed precision training
+    scaler = amp.GradScaler()
 
-    total_timesteps = 50000000 * num_gpus  # Scale with number of GPUs
+    # Modify the PPO's _train_step method to use mixed precision
+    def mixed_precision_train_step(self, gradient_steps: int, batch_size: int = 64) -> None:
+        # Record original train step method
+        original_train_step = self._train_step
+
+        # Define new train step method with mixed precision
+        def new_train_step(gradient_steps: int, batch_size: int = 64) -> None:
+            for _ in range(gradient_steps):
+                with amp.autocast():
+                    loss = original_train_step(1, batch_size)
+                scaler.scale(loss).backward()
+                scaler.step(self.policy.optimizer)
+                scaler.update()
+
+        # Replace train step method
+        self._train_step = new_train_step
+
+    # Apply mixed precision to model
+    mixed_precision_train_step(model)
+
+    total_timesteps = 100000000  # Increased total timesteps
 
     try:
         model.learn(
@@ -113,5 +125,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"An error occurred during training: {e}")
     finally:
-        model.save("ppo_custom_env_multi_gpu")
+        model.save("ppo_custom_env_optimized_gpu")
         print("Training completed and model saved.")
