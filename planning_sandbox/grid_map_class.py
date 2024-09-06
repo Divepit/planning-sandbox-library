@@ -57,7 +57,6 @@ class GridMap:
             self.obstacles.clear()
             self.generate_random_obstacles(num_obstacles)
             if nx.is_connected(self.graph):
-                print("Obstacles: ", self.obstacles)
                 break
 
     def get_grid(self):
