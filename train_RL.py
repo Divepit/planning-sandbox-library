@@ -56,8 +56,8 @@ if __name__ == "__main__":
     print(f"Number of environments: {num_envs}")
 
     num_agents = 3
-    num_goals = 3
-    num_obstacles = 0
+    num_goals = 5
+    num_obstacles = 5
     width = 8
     height = 8
     num_skills = 2

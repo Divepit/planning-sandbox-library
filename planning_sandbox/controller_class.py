@@ -1,10 +1,11 @@
 import numpy as np
+from planning_sandbox.grid_map_class import GridMap
 
 class Controller:
     def __init__(self, agents, grid_map):
         self.agents = agents
         
-        self.grid_map = grid_map
+        self.grid_map: GridMap = grid_map
 
         self.action_map = {
             0: 'stay',

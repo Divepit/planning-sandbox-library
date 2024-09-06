@@ -224,7 +224,7 @@ if __name__ == "__main__":
         n_steps=2048,
         batch_size=min(32768, num_envs * max_steps),  # Reduced batch size
         n_epochs=48,
-        learning_rate=linear_schedule(1e-5),
+        learning_rate=linear_schedule(1e-7),
         clip_range=0.2,
         ent_coef=0.01,
         policy_kwargs = dict(

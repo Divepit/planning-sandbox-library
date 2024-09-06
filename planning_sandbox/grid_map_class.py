@@ -10,7 +10,7 @@ class GridMap:
         self.occupied_positions = []
 
         self.graph = None
-        self.generate_connected_grid_with_obstalces(num_obstacles)
+        self.generate_connected_grid_with_obstalces(self.num_obstacles)
     
     def reset(self):
         self.obstacles = []
@@ -23,10 +23,11 @@ class GridMap:
         self.graph.remove_node(pos)
 
     def add_occupied_position(self, pos):
-        self.occupied_positions.append
+        self.occupied_positions.append(pos)
     
     def is_valid_position(self, pos):
         # input: (x, y)
+        
         return (0 <= pos[0] < self.width and 
                 0 <= pos[1] < self.height and 
                 pos not in self.obstacles and
