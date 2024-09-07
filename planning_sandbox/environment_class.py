@@ -43,26 +43,25 @@ class Environment:
     def _initialize_agents(self):
         for _ in range(self.num_agents):
             agent = Agent(self.grid_map.random_valid_position())
-            self.grid_map.add_occupied_position(agent.position)
+            # self.grid_map.add_occupied_position(agent.position)
             self.agents.append(agent)
 
     def _initialize_goals(self):
         for _ in range(self.num_goals):
             goal = Goal(self.grid_map.random_valid_position())
-            self.grid_map.add_occupied_position(goal.position)
+            # self.grid_map.add_occupied_position(goal.position)
             self.goals.append(goal)
 
     def reset(self):
 
         self.grid_map.reset()
-        
         for agent in self.agents:
             agent.reset(self.grid_map.random_valid_position())
-            self.grid_map.add_occupied_position(agent.position)
+            # self.grid_map.add_occupied_position(agent.position)
 
         for goal in self.goals:
             goal.reset(self.grid_map.random_valid_position())
-            self.grid_map.add_occupied_position(goal.position)
+            # self.grid_map.add_occupied_position(goal.position)
 
 
         self.planner.reset()

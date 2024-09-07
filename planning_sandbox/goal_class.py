@@ -15,6 +15,7 @@ class Goal:
         return self.required_skills
     
     def claim(self):
+        # print('Goal claimed')
         self.claimed = True 
 
     def reset(self, position=None):

@@ -25,6 +25,8 @@ class Controller:
             position = (position[0], position[1] - 1)
         elif action == 'down' or action == 4:
             position = (position[0], position[1] + 1)
+        elif action == 'stay' or action == 0:
+            return True
         is_valid = self.grid_map.is_valid_position(position)
         return is_valid
     
@@ -38,6 +40,7 @@ class Controller:
     def get_random_valid_action(self, agent):
         valid_actions = self.get_valid_actions(agent)
         return np.random.choice(valid_actions)
+    
 
     def reset(self):
         pass

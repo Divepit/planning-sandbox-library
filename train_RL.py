@@ -37,6 +37,9 @@ class TensorboardCallback(BaseCallback):
         for info in self.locals['infos']:
             if 'episode' in info:
                 self.episode_rewards.append(info['episode']['r'])
+                self.logger.record("env/claimed_goals", info['episode']['claimed_goals']) 
+                self.logger.record("env/invalid_actions", info['episode']['invalid_actions']) 
+                self.logger.record("env/stay_actions", info['episode']['stay_actions'])
         return True
 
 def make_env(rank, num_agents, num_goals, num_obstacles, width, height, num_skills, seed=0):
@@ -57,7 +60,7 @@ if __name__ == "__main__":
 
     num_agents = 3
     num_goals = 5
-    num_obstacles = 5
+    num_obstacles = 0
     width = 8
     height = 8
     num_skills = 2
@@ -76,10 +79,10 @@ if __name__ == "__main__":
         verbose=1,
         n_steps=max_steps,
         batch_size=max_steps*num_envs,
-        n_epochs=48,
-        learning_rate=linear_schedule(5e-6),
+        n_epochs=24,
+        learning_rate=linear_schedule(2.5e-4),
         clip_range=0.8,
-        ent_coef=0.05,
+        ent_coef=0.025,
         policy_kwargs = dict(
             net_arch=dict(pi=[512, 512, 512], vf=[256, 256]),
             activation_fn=torch.nn.ReLU

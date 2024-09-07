@@ -49,6 +49,9 @@ class Scheduler:
     
     def _get_skills_of_agents_present_at_goal(self, goal):
         agents = self._get_agents_present_at_goal(goal)
+        if not agents:
+            return []
+        # print(f"Agents present at goal: {agents}")
         skills = []
         for agent in agents:
             skills.extend(agent.skills)
@@ -59,14 +62,23 @@ class Scheduler:
     
     def _goal_can_be_claimed(self, goal):
         skills_of_agents_present = self._get_skills_of_agents_present_at_goal(goal)
+        if not skills_of_agents_present:
+            return False
+        # print(f"Skills of agents present at goal: {skills_of_agents_present}")
         skills_required = goal.required_skills
-        for skill in skills_required:
-            if skill not in skills_of_agents_present:
-                return False
+        # print(f"Skills required for goal: {skills_required}, Skills of agents present: {skills_of_agents_present}")
+        if set(skills_required).issubset(set(skills_of_agents_present)):
+            return True
     
     def _update_goal_status(self, goal):
+        amount_of_claimed_goals = 0
+        if goal.claimed:
+            return 0
         if self._goal_can_be_claimed(goal):
+            # print(f"Goal at position {goal.position} can be claimed")
             goal.claim()
+            amount_of_claimed_goals += 1
+        return amount_of_claimed_goals
 
     def _get_normalized_claimed_goals(self):
         # 1 if claimed, 0 if not
@@ -79,5 +91,7 @@ class Scheduler:
         return self.goal_assignments[agent]
     
     def update_goal_statuses(self):
+        amount_of_claimed_goals = 0
         for goal in self.goals:
-            self._update_goal_status(goal)
+            amount_of_claimed_goals += self._update_goal_status(goal)
+        return amount_of_claimed_goals

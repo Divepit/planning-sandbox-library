@@ -7,14 +7,14 @@ class GridMap:
         self.height = height
         self.num_obstacles = num_obstacles
         self.obstacles = []
-        self.occupied_positions = []
+        # self.occupied_positions = []
         self.graph = None
         self.generate_connected_grid_with_obstalces(self.num_obstacles)
 
 
     def reset(self):
         self.obstacles.clear()
-        self.occupied_positions.clear()
+        # self.occupied_positions.clear()
         self.graph = None
         self.generate_connected_grid_with_obstalces(self.num_obstacles)
 
@@ -22,16 +22,16 @@ class GridMap:
         self.obstacles.append(pos)
         self.graph.remove_node(pos)
 
-    def add_occupied_position(self, pos):
-        self.occupied_positions.append(pos)
+    # def add_occupied_position(self, pos):
+    #     self.occupied_positions.append(pos)
     
     def is_valid_position(self, pos):
         # input: (x, y)
         
         return (0 <= pos[0] < self.width and 
                 0 <= pos[1] < self.height and 
-                pos not in self.obstacles and
-                pos not in self.occupied_positions)
+                pos not in self.obstacles) # and
+                # pos not in self.occupied_positions)
     
     def random_position(self):
         return (np.random.randint(0, self.width), np.random.randint(0, self.height))

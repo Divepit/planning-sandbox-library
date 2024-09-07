@@ -34,35 +34,37 @@ class RLEnv(gym.Env):
         reward = 0
         self.step_count += 1
         
-        amount_previously_unclaimed_goals = len(self.sandboxEnv.scheduler._get_unclaimed_goals())
+        amount_of_claimed_goals = 0
 
         for i, agent in enumerate(self.sandboxEnv.agents):
             agent_action = self.sandboxEnv.controller.action_map[actions[i]]
             action_is_valid = self.sandboxEnv.controller.validate_action(agent, agent_action)
             if action_is_valid:
-                if agent_action == 0:
+                if agent_action == 0 or agent_action == 'stay':
                     reward -= 1
+                    self.episode_stay_actions += 1
                 agent.apply_action(agent_action)
             else:
-                reward -= -10
-            self.sandboxEnv.scheduler.update_goal_statuses()
+                reward -= 10
+                self.episode_invalid_actions += 1
+            amount_of_claimed_goals += self.sandboxEnv.scheduler.update_goal_statuses()
         
-        amount_newly_claimed_goals = len(self.sandboxEnv.scheduler._get_unclaimed_goals()) - amount_previously_unclaimed_goals
-        reward += amount_newly_claimed_goals*10
+        reward += amount_of_claimed_goals*10
                 
         done = (self.step_count >= self.max_steps) or self.sandboxEnv.scheduler.all_goals_claimed()
 
-        if done:
-            for goal in self.sandboxEnv.goals:
-                if not goal.claimed:
-                    reward -= 2
+        # if done:
+        #     for goal in self.sandboxEnv.goals:
+        #         if not goal.claimed:
+        #             reward -= 0.2
          
         reward -= (self.step_count/self.max_steps)
 
         self.episode_reward += reward
+        self.episode_claimed_goals += amount_of_claimed_goals        
 
         if done:
-            info = {"episode": {"r": self.episode_reward, "l": self.step_count}}
+            info = {"episode": {"r": self.episode_reward, "l": self.step_count, "claimed_goals": self.episode_claimed_goals, "invalid_actions": self.episode_invalid_actions, "stay_actions": self.episode_stay_actions}}
         else:
             info = {}
 
@@ -72,6 +74,9 @@ class RLEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.episode_reward = 0
+        self.episode_claimed_goals = 0
+        self.episode_invalid_actions = 0
+        self.episode_stay_actions = 0
         self.step_count = 0
         self.sandboxEnv.reset()
         return self._get_obs(), {}
