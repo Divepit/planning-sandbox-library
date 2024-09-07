@@ -6,7 +6,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 # Load the trained model
 try:
-    model = PPO.load("ppo_custom_env_improved_goal_assignment")
+    model = PPO.load("ppo_custom_env_optimized_gpu")
     print("Loaded trained model")
 except FileNotFoundError:
     print("Trained model not found. Please make sure the model file exists.")
@@ -16,10 +16,10 @@ except FileNotFoundError:
 
 num_agents = 3
 num_goals = 5
-num_obstacles = 5
-width = 8
-height = 8
-num_skills = 2
+num_obstacles = 10
+width = 12
+height = 12
+num_skills = 3
 
 sandboxEnv = Environment(width=width, height=height, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
 RLenv = RLEnv(sandboxEnv)
