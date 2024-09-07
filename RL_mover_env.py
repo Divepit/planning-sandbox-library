@@ -48,7 +48,7 @@ class RLEnv(gym.Env):
             self.sandboxEnv.scheduler.update_goal_statuses()
         
         amount_newly_claimed_goals = len(self.sandboxEnv.scheduler._get_unclaimed_goals()) - amount_previously_unclaimed_goals
-        reward += amount_newly_claimed_goals*20
+        reward += amount_newly_claimed_goals*10
                 
         done = (self.step_count >= self.max_steps) or self.sandboxEnv.scheduler.all_goals_claimed()
 
