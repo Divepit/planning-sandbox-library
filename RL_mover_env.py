@@ -58,14 +58,13 @@ class RLEnv(gym.Env):
                 reward -= 100
                 done = True
                 self.episode_invalid_actions += 1
-                break
             amount_of_claimed_goals += self.sandboxEnv.scheduler.update_goal_statuses()
         
-        reward += amount_of_claimed_goals*10
+        reward += amount_of_claimed_goals*30
+        reward -= (self.step_count/self.max_steps)
                 
         done = done or (self.step_count >= self.max_steps) or self.sandboxEnv.scheduler.all_goals_claimed()
          
-        reward -= (self.step_count/self.max_steps)
 
         self.episode_reward += reward
         self.episode_claimed_goals += amount_of_claimed_goals        
