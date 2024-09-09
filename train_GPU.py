@@ -58,6 +58,10 @@ class TensorboardCallback(BaseCallback):
         for info in self.locals['infos']:
             if 'episode' in info:
                 self.episode_rewards.append(info['episode']['r'])
+                self.logger.record("env/claimed_goals", info['episode']['claimed_goals']) 
+                self.logger.record("env/invalid_actions", info['episode']['invalid_actions']) 
+                self.logger.record("env/stay_actions", info['episode']['stay_actions'])
+                self.logger.record("env/episode_reward", info['episode']['r'])
         return True
 
 def make_env(rank, num_agents, num_goals, num_obstacles, width, height, num_skills, seed=0):
@@ -197,10 +201,10 @@ if __name__ == "__main__":
     # Environment parameters
     num_agents = 3
     num_goals = 5
-    num_obstacles = 10
-    width = 12
-    height = 12
-    num_skills = 3
+    num_obstacles = 0
+    width = 8
+    height = 8
+    num_skills = 2
     max_steps = width * height
 
     num_envs = get_safe_num_envs()

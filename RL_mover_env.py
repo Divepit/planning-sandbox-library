@@ -41,7 +41,7 @@ class RLEnv(gym.Env):
             action_is_valid = self.sandboxEnv.controller.validate_action(agent, agent_action)
             if action_is_valid:
                 if agent_action == 0 or agent_action == 'stay':
-                    reward -= 1
+                    reward -= 1.5
                     self.episode_stay_actions += 1
                 agent.apply_action(agent_action)
             else:
@@ -49,7 +49,7 @@ class RLEnv(gym.Env):
                 self.episode_invalid_actions += 1
             amount_of_claimed_goals += self.sandboxEnv.scheduler.update_goal_statuses()
         
-        reward += amount_of_claimed_goals*10
+        reward += amount_of_claimed_goals*15
                 
         done = (self.step_count >= self.max_steps) or self.sandboxEnv.scheduler.all_goals_claimed()
 
@@ -58,7 +58,7 @@ class RLEnv(gym.Env):
         #         if not goal.claimed:
         #             reward -= 0.2
          
-        reward -= (self.step_count/self.max_steps)
+        reward -= 2*(self.step_count/self.max_steps)
 
         self.episode_reward += reward
         self.episode_claimed_goals += amount_of_claimed_goals        
