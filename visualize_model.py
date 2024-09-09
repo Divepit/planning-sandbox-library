@@ -7,7 +7,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 # Load the trained model
 try:
     # model = PPO.load("ppo_custom_env_optimized_gpu")
-    model = PPO.load("ppo_custom_env_improved_goal_assignment")
+    model = PPO.load("/Users/marco/Programming/PlanningEnvironmentLibrary/saved_models/50M_run")
     print("Loaded trained model")
 except FileNotFoundError:
     print("Trained model not found. Please make sure the model file exists.")
@@ -43,7 +43,7 @@ step = 0
 while not done:
 
     model_action, _ = model.predict(obs, deterministic=False)
-    visualizer.run_step(iterations=2)
+    visualizer.run_step(iterations=1)
     
     # Handle different return types from env.step()
     step_return = RLenv.step(model_action)
