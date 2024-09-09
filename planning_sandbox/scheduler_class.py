@@ -95,3 +95,15 @@ class Scheduler:
         for goal in self.goals:
             amount_of_claimed_goals += self._update_goal_status(goal)
         return amount_of_claimed_goals
+    
+    def is_goal_position(self, position):
+        return any([goal.position == position for goal in self.goals])
+    
+    def get_goal_at_position(self, position):
+        for goal in self.goals:
+            if goal.position == position:
+                return goal
+        return None
+    
+    def agent_has_one_or_more_required_skills_for_goal(self, agent, goal):
+        return any([skill in agent.skills for skill in goal.required_skills])

@@ -102,20 +102,22 @@ class Environment:
             agent.skills = skills
 
     def get_normalized_skill_vectors_for_all_agents(self):
-        normalized_skill_vectors = []
+        all_skills_normalized = []
         for agent in self.agents:
-            skill_vector = agent.get_skills()
-            normalized_skill_vector = [self.normalized_skill_map[skill] for skill in skill_vector]
-            normalized_skill_vectors.append(normalized_skill_vector)
-        return normalized_skill_vectors
+            agent_skills_normalized = [0]*self.num_skills
+            for skill in agent.skills:
+                agent_skills_normalized[skill] = 1
+            all_skills_normalized.extend(agent_skills_normalized)
+        return all_skills_normalized
     
     def get_normalized_skill_vectors_for_all_goals(self):
-        normalized_skill_vectors = []
+        all_skills_normalized = []
         for goal in self.goals:
-            skill_vector = goal.required_skills
-            normalized_skill_vector = [self.normalized_skill_map[skill] for skill in skill_vector]
-            normalized_skill_vectors.append(normalized_skill_vector)
-        return normalized_skill_vectors
+            goal_skills_normalized = [0]*self.num_skills
+            for skill in goal.required_skills:
+                goal_skills_normalized[skill] = 1
+            all_skills_normalized.extend(goal_skills_normalized)
+        return all_skills_normalized
 
     # def visualize_state(self, iterations=1):
     #     self.visualizer.run_step(self.agents, self.goals, iterations=iterations)

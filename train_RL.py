@@ -40,7 +40,8 @@ class TensorboardCallback(BaseCallback):
                 self.logger.record("env/claimed_goals", info['episode']['claimed_goals']) 
                 self.logger.record("env/invalid_actions", info['episode']['invalid_actions']) 
                 self.logger.record("env/stay_actions", info['episode']['stay_actions'])
-                self.logger.record("env/episode_reward", info['episode']['r'])
+                self.logger.record("env/goal_stay_actions", info['episode']['goal_stay_actions'])
+                # self.logger.record("env/episode_reward", info['episode']['r'])
         return True
 
 def make_env(rank, num_agents, num_goals, num_obstacles, width, height, num_skills, seed=0):

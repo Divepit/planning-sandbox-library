@@ -33,6 +33,7 @@ class RLEnv(gym.Env):
         actions = np.array(action)
         reward = 0
         self.step_count += 1
+        done = False
         
         amount_of_claimed_goals = 0
 
@@ -41,30 +42,36 @@ class RLEnv(gym.Env):
             action_is_valid = self.sandboxEnv.controller.validate_action(agent, agent_action)
             if action_is_valid:
                 if agent_action == 0 or agent_action == 'stay':
-                    reward -= 1.5
                     self.episode_stay_actions += 1
+                    if self.sandboxEnv.scheduler.is_goal_position(agent.position):
+                        goal_at_position = self.sandboxEnv.scheduler.get_goal_at_position(agent.position)
+                        goal_already_claimed = goal_at_position.claimed
+                        if not goal_already_claimed:
+                            skill_match = self.sandboxEnv.scheduler.agent_has_one_or_more_required_skills_for_goal(agent, goal_at_position)
+                            if skill_match:
+                                self.episode_goal_stay_actions += 1
+                                reward += 2
+                    else:
+                        reward -= 0.5
                 agent.apply_action(agent_action)
             else:
-                reward -= 10
+                reward -= 100
+                done = True
                 self.episode_invalid_actions += 1
+                break
             amount_of_claimed_goals += self.sandboxEnv.scheduler.update_goal_statuses()
         
-        reward += amount_of_claimed_goals*15
+        reward += amount_of_claimed_goals*10
                 
-        done = (self.step_count >= self.max_steps) or self.sandboxEnv.scheduler.all_goals_claimed()
-
-        # if done:
-        #     for goal in self.sandboxEnv.goals:
-        #         if not goal.claimed:
-        #             reward -= 0.2
+        done = done or (self.step_count >= self.max_steps) or self.sandboxEnv.scheduler.all_goals_claimed()
          
-        reward -= 2*(self.step_count/self.max_steps)
+        reward -= (self.step_count/self.max_steps)
 
         self.episode_reward += reward
         self.episode_claimed_goals += amount_of_claimed_goals        
 
         if done:
-            info = {"episode": {"r": self.episode_reward, "l": self.step_count, "claimed_goals": self.episode_claimed_goals, "invalid_actions": self.episode_invalid_actions, "stay_actions": self.episode_stay_actions}}
+            info = {"episode": {"r": self.episode_reward, "l": self.step_count, "claimed_goals": self.episode_claimed_goals, "invalid_actions": self.episode_invalid_actions, "stay_actions": self.episode_stay_actions, "goal_stay_actions": self.episode_goal_stay_actions}}
         else:
             info = {}
 
@@ -77,6 +84,7 @@ class RLEnv(gym.Env):
         self.episode_claimed_goals = 0
         self.episode_invalid_actions = 0
         self.episode_stay_actions = 0
+        self.episode_goal_stay_actions = 0
         self.step_count = 0
         self.sandboxEnv.reset()
         return self._get_obs(), {}
@@ -93,53 +101,47 @@ class RLEnv(gym.Env):
 
         self.obs_size = (2*len(self.normalized_obstacle_positions) +
                         2*len(self.normalized_goal_positions) +
-                        (self.sandboxEnv.num_skills+1)*len(self.normalized_goal_skill_vectors) +
+                        len(self.normalized_goal_skill_vectors) +
                         2*len(self.normalized_agent_positions) +
-                        (self.sandboxEnv.num_skills+1)*len(self.normalized_agent_skill_vectors) +
+                        len(self.normalized_agent_skill_vectors) +
                         len(self.normalized_claimed_goals_vector) +
                         1)
         
         self.observation_space = gym.spaces.Box(low=0, high=1, shape=(self.obs_size,), dtype=np.float32)
 
     def _get_obs(self):
-        
         self._update_obs_values()
 
         obs = np.zeros(self.obs_size, dtype=np.float32)
         offset = 0
 
-        for i, pos in enumerate(self.normalized_obstacle_positions):
-            obs[i] = pos[0]
-            obs[i + 1] = pos[1]
+        for pos in self.normalized_obstacle_positions:
+            obs[offset] = pos[0]
+            obs[offset + 1] = pos[1]
             offset += 2
         
-        for i, pos in enumerate(self.normalized_goal_positions):
-            obs[i + offset] = pos[0]
-            obs[i + 1 + offset] = pos[1]
+        for pos in self.normalized_goal_positions:
+            obs[offset] = pos[0]
+            obs[offset + 1] = pos[1]
             offset += 2
         
-        for i, skill_vector in enumerate(self.normalized_goal_skill_vectors):
-            for j, skill in enumerate(skill_vector):
-                obs[j + offset] = skill
-            offset += len(skill_vector)
+        obs[offset:offset+len(self.normalized_goal_skill_vectors)] = self.normalized_goal_skill_vectors
+        offset += len(self.normalized_goal_skill_vectors)
         
-        for i, pos in enumerate(self.normalized_agent_positions):
-            obs[i + offset] = pos[0]
-            obs[i + 1 + offset] = pos[1]
+        for pos in self.normalized_agent_positions:
+            obs[offset] = pos[0]
+            obs[offset + 1] = pos[1]
             offset += 2
         
-        for i, skill_vector in enumerate(self.normalized_agent_skill_vectors):
-            for j, skill in enumerate(skill_vector):
-                obs[j + offset] = skill
-            offset += len(skill_vector)
+        obs[offset:offset+len(self.normalized_agent_skill_vectors)] = self.normalized_agent_skill_vectors
+        offset += len(self.normalized_agent_skill_vectors)
         
-        for i, claimed in enumerate(self.normalized_claimed_goals_vector):
-            obs[i + offset] = claimed
-            offset += 1
+        obs[offset:offset+len(self.normalized_claimed_goals_vector)] = self.normalized_claimed_goals_vector
+        offset += len(self.normalized_claimed_goals_vector)
 
         obs[offset] = self.normalized_step_count
         offset += 1
         
-
-
+        assert offset == self.obs_size, f"Observation size mismatch: {offset} vs {self.obs_size}"
+        
         return obs
