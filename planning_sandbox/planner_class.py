@@ -66,3 +66,7 @@ class Planner:
         if agent in self.paths:
             return self.paths[agent][-1]
         return None
+    
+    def assign_shortest_path_for_goal_to_agent(self, agent, goal):
+        path = self.generate_shortest_path_for_agent(agent, goal)
+        self.assign_path_to_agent(agent, path)

@@ -73,3 +73,9 @@ class GridMap:
     
     def get_normalized_obstacles(self):
         return self.get_normalized_positions(self.obstacles)
+    
+    def euclidean_distance(self, pos1, pos2):
+        return np.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
+    
+    def manhattan_distance(self, pos1, pos2):
+        return np.abs(pos1[0] - pos2[0]) + np.abs(pos1[1] - pos2[1])
