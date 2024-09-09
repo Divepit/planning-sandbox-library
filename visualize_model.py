@@ -18,9 +18,10 @@ except FileNotFoundError:
 num_agents = 3
 num_goals = 5
 num_obstacles = 0
-width = 5
-height = 5
+width = 8
+height = 8
 num_skills = 2
+max_steps = width * height
 
 sandboxEnv = Environment(width=width, height=height, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
 RLenv = RLEnv(sandboxEnv)

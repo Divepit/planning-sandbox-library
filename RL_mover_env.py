@@ -51,6 +51,10 @@ class RLEnv(gym.Env):
                             if skill_match:
                                 self.episode_goal_stay_actions += 1
                                 reward += 2
+                            else:
+                                reward -= 0.5
+                        else:
+                            reward -= 0.5
                     else:
                         reward -= 0.5
                 agent.apply_action(agent_action)

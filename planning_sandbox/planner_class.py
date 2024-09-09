@@ -11,6 +11,9 @@ class Planner:
         self.paths = {}
 
     def generate_shortest_path_for_agent(self, agent, goal):
+        current_agent_goal = self.get_agent_current_goal(agent)
+        if current_agent_goal is not None and current_agent_goal == goal.position:
+            return self.paths[agent]
         start = agent.position
         goal = goal.position
         path = self.grid_map.shortest_path(start, goal)
@@ -44,6 +47,8 @@ class Planner:
             return 'right'
         elif current_position[0] == next_position[0] + 1 and current_position[1] == next_position[1]:
             return 'left'
+        elif current_position[0] == next_position[0] and current_position[1] == next_position[1]:
+            return 'stay'
         else:
             return 'moveto'
 
@@ -57,4 +62,7 @@ class Planner:
             next_moves[agent] = self.get_move_to_reach_next_position(agent)
         return next_moves
     
-   
+    def get_agent_current_goal(self, agent):
+        if agent in self.paths:
+            return self.paths[agent][-1]
+        return None

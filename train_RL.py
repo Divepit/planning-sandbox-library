@@ -1,7 +1,7 @@
 import os
 import signal
 import torch
-from RL_mover_env import RLEnv
+from RL_SP_env import RLEnv
 from planning_sandbox.environment_class import Environment
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.utils import set_random_seed
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         n_steps=max_steps,
         batch_size=max_steps*num_envs,
         n_epochs=24,
-        learning_rate=linear_schedule(2.5e-4),
+        learning_rate=linear_schedule(5e-4),
         clip_range=0.8,
         ent_coef=0.025,
         policy_kwargs = dict(
