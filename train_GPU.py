@@ -240,7 +240,7 @@ if __name__ == "__main__":
         tensorboard_log=log_dir,
     )
 
-    total_timesteps = 50000000  # Reduced total timesteps
+    total_timesteps = 500000000  # Reduced total timesteps
 
     logging.info("Starting training...")
     try:
