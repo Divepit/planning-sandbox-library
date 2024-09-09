@@ -228,12 +228,12 @@ if __name__ == "__main__":
         verbose=1,
         n_steps=2048,
         batch_size=min(32768, num_envs * max_steps),  # Reduced batch size
-        n_epochs=48,
+        n_epochs=24,
         learning_rate=linear_schedule(2.5e-4),
         clip_range=0.8,
         ent_coef=0.025,
         policy_kwargs = dict(
-            net_arch=dict(pi=[512, 512, 512, 512], vf=[512, 512, 512]),  # Reduced network size
+            net_arch=dict(pi=[256, 128, 64,32], vf=[256, 128, 64]),  # Reduced network size
             activation_fn=torch.nn.ReLU
         ),
         device=device,

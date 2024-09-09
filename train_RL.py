@@ -86,7 +86,7 @@ if __name__ == "__main__":
         clip_range=0.8,
         ent_coef=0.025,
         policy_kwargs = dict(
-            net_arch=dict(pi=[512, 512, 512], vf=[256, 256]),
+            net_arch=dict(pi=[128, 64, 32], vf=[64, 32]),
             activation_fn=torch.nn.ReLU
         ),
         device=device,
