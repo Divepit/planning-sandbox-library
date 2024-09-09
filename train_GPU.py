@@ -229,7 +229,7 @@ if __name__ == "__main__":
         n_steps=2048,
         batch_size=min(32768, num_envs * max_steps),  # Reduced batch size
         n_epochs=24,
-        learning_rate=linear_schedule(2.5e-4),
+        learning_rate=linear_schedule(0.0000075),
         clip_range=0.8,
         ent_coef=0.025,
         policy_kwargs = dict(
