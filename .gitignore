@@ -1,3 +1,6 @@
-/logs
+*/logs
 ppo_*
 saved_models
+*.tif
+*pycache*
+*.DS_Store
