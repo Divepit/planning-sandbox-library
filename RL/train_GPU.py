@@ -65,9 +65,9 @@ class TensorboardCallback(BaseCallback):
                 # self.logger.record("env/episode_reward", info['episode']['r'])
         return True
 
-def make_env(rank, num_agents, num_goals, num_obstacles, width, height, num_skills, seed=0):
+def make_env(rank, num_agents, num_goals, num_obstacles, size, num_skills, seed=0):
     def _init():
-        sandbox_env = Environment(width=width, height=height, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
+        sandbox_env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
         env = RLEnv(env=sandbox_env)
         env.reset(seed=seed + rank)
         return env
@@ -203,15 +203,14 @@ if __name__ == "__main__":
     num_agents = 3
     num_goals = 5
     num_obstacles = 0
-    width = 8
-    height = 8
+    size = 8
     num_skills = 2
-    max_steps = width * height
+    max_steps = size**2
 
     num_envs = get_safe_num_envs()
     logging.info(f"Initializing {num_envs} environments...")
 
-    envs = [make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, width=width, height=height, num_skills=num_skills) for i in range(num_envs)]
+    envs = [make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, size=size, num_skills=num_skills) for i in range(num_envs)]
 
     logging.info("Initializing SubprocVecEnv...")
     env = SubprocVecEnv(envs)

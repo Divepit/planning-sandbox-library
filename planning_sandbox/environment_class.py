@@ -1,5 +1,11 @@
-from typing import List
+from typing import List, Dict, Tuple
 
+import networkx as nx
+import copy
+import time
+
+
+from itertools import combinations, permutations, product
 from planning_sandbox.grid_map_class import GridMap
 from planning_sandbox.agent_class import Agent
 from planning_sandbox.goal_class import Goal
@@ -11,9 +17,8 @@ from planning_sandbox.planner_class import Planner
 import numpy as np
 
 class Environment:
-    def __init__(self, width, height, num_agents, num_goals, num_obstacles, num_skills):
-        self.width = width
-        self.height = height
+    def __init__(self, size, num_agents, num_goals, num_obstacles, num_skills, use_geo_data=False):
+        self.size = size
 
         self.num_agents = num_agents
         self.num_goals = num_goals
@@ -21,8 +26,9 @@ class Environment:
         self.num_skills = num_skills
 
 
-        self.grid_map = GridMap(width, height, num_obstacles)
+        self.grid_map = GridMap(self.size, num_obstacles, use_geo_data=use_geo_data)
         self.obstacles = self.grid_map.obstacles
+        self.starting_position = self.grid_map.random_valid_position()
 
         self.agents = []
         self._initialize_agents()
@@ -32,29 +38,38 @@ class Environment:
         self._initialize_goals()
 
         self.normalized_skill_map = {i: i / self.num_skills for i in range(self.num_skills)}
-        self._initialize_skills()
+        
+        while not self._all_skills_represented():
+            self._reset_skills()
+            self._initialize_skills()
 
-        self.controller = Controller(self.agents, self.grid_map)
+        self.controller = Controller(self.grid_map)
         self.planner = Planner(self.agents, self.grid_map)
         self.scheduler = Scheduler(self.agents, self.goals)
         
-        # self.visualizer = Visualizer(self.width, self.height, self.obstacles)
-
     def _initialize_agents(self):
+        if self.starting_position is not None:
+            start_pos = self.starting_position
+        else:
+            start_pos = self.grid_map.random_valid_position()
         for _ in range(self.num_agents):
-            agent = Agent(self.grid_map.random_valid_position())
+            agent = Agent(start_pos)
             # self.grid_map.add_occupied_position(agent.position)
             self.agents.append(agent)
 
     def _initialize_goals(self):
         for _ in range(self.num_goals):
-            goal = Goal(self.grid_map.random_valid_position())
+            random_position = self.grid_map.random_valid_position()
+            while random_position in [agent.position for agent in self.agents]:
+                random_position = self.grid_map.random_valid_position()
+            goal = Goal(random_position)
             # self.grid_map.add_occupied_position(goal.position)
             self.goals.append(goal)
 
     def reset(self):
 
         self.grid_map.reset()
+
         for agent in self.agents:
             agent.reset(self.grid_map.random_valid_position())
             # self.grid_map.add_occupied_position(agent.position)
@@ -76,13 +91,15 @@ class Environment:
         # ensure that no goal has the same skill twice and no agent has the same skill twice
         if self.num_skills == 1:
             for goal in self.goals:
-                goal.add_skill(0)
+                if goal.required_skills == []:
+                    goal.add_skill(0)
             for agent in self.agents:
-                agent.add_skill(0)
+                if agent.skills == []:
+                    agent.add_skill(0)
             return
 
         for goal in self.goals:
-            amount_of_skills = np.random.randint(1, self.num_skills+1)
+            amount_of_skills = np.random.randint(1, min(3,self.num_skills+1))
             skills = []
             for _ in range(amount_of_skills):
                 skill = np.random.randint(0, self.num_skills)
@@ -92,7 +109,10 @@ class Environment:
             goal.required_skills = skills
                 
         for agent in self.agents:
-            amount_of_skills = np.random.randint(1, self.num_skills+1)
+            if self.num_skills == 2:
+                amount_of_skills = 1
+            else:
+                amount_of_skills = np.random.randint(1, max(1,min(3,self.num_skills)))
             skills = []
             for _ in range(amount_of_skills):
                 skill = np.random.randint(0, self.num_skills)
@@ -100,6 +120,103 @@ class Environment:
                     skill = np.random.randint(0, self.num_skills)
                 skills.append(skill)
             agent.skills = skills
+
+    def _all_skills_represented(self):
+        all_skills = [0]*self.num_skills
+        for agent in self.agents:
+            for skill in agent.skills:
+                all_skills[skill] = 1
+        return all(all_skills)
+    
+    def _reset_skills(self):
+        for agent in self.agents:
+            agent.skills = []
+        for goal in self.goals:
+            goal.required_skills = []
+        self._initialize_skills()
+
+    def _calculate_path_cost(self, path):
+        return (nx.path_weight(self.grid_map.graph, path, weight="weight"))*(len(path)/self.size)
+
+    def _get_all_agent_to_goal_plans(self):
+        agent_goal_plans: Dict[Tuple[Agent, Goal], List[int]]  = {}
+        agent_goal_costs: Dict[Tuple[Agent, Goal], int]  = {}
+        allowed_goal_agent_pairs: List[Tuple[Goal, Agent]] = []
+        allowed_goal_agent_pairs = self.scheduler.get_allowed_goal_agent_pairs(goals=self.scheduler.unclaimed_goals, agents=self.agents)
+        for agent, goal in allowed_goal_agent_pairs:
+            path = self.planner.generate_shortest_path_for_agent(agent=agent,goal=goal)
+            agent_goal_plans[(agent,goal)] = path
+            agent_goal_costs[(agent,goal)] = self._calculate_path_cost(path)
+        return agent_goal_plans, agent_goal_costs
+    
+
+    def _get_all_goal_to_goal_plans(self):
+        goal_goal_plans: Dict[Tuple[Goal, Goal], List[int]] = {}
+        goal_goal_costs: Dict[Tuple[Goal, Goal], int] = {}
+        goal_goal_combinations = permutations(self.scheduler.unclaimed_goals, 2)
+        for combination in goal_goal_combinations:
+            path = self.grid_map.shortest_path(start=combination[0].position, goal=combination[1].position)
+            goal_goal_plans[combination] = path
+            goal_goal_costs[combination] = self._calculate_path_cost(path)
+        return goal_goal_plans, goal_goal_costs
+    
+    def _get_all_goal_solutions(self, agent_goal_plans):
+        goal_solutions: Dict[Goal,List[List[Agent]]] = {}
+        for goal in self.scheduler.unclaimed_goals:
+            goal_solutions[goal] = []
+            for r in range(1,self.num_agents+1):
+                combos = combinations(self.agents, r)
+                for combination in combos:
+                    invalid_combination = False
+                    for agent in combination:
+                        if (agent,goal) not in agent_goal_plans:
+                            invalid_combination = True
+                            break
+                    if invalid_combination:
+                        invalid_combination = False
+                        continue
+                    if self.scheduler.agent_combination_has_required_skills_for_goal(agents=combination, goal=goal):
+                        goal_solutions[goal].append(combination)
+        return goal_solutions
+    
+    def _get_all_possible_solutions(self, goal_solutions):
+        solution_lists = list(goal_solutions.values())
+        combinations_of_agents_for_goals = product(*solution_lists)
+        possible_solutions = []
+        for combination_set in combinations_of_agents_for_goals:
+            possible_solution = {}
+            for i,combination in enumerate(combination_set):
+                goal = list(goal_solutions.keys())[i]
+                for agent in combination:
+                    if agent not in possible_solution:
+                        possible_solution[agent] = []
+                    possible_solution[agent].append(goal)
+            possible_solutions.append(possible_solution)
+        return possible_solutions
+    
+    def _calculate_cost_of_solution(self, solution: Dict[Agent, List[Goal]], agent_goal_costs, goal_goal_costs) -> int:
+        solution_cost = []
+        for agent, goals in solution.items():
+            if goals == []:
+                continue
+            first_goal = goals[0]
+            path_cost = agent_goal_costs[(agent,first_goal)]
+            for i in range(2,len(goals)):
+                path_cost += goal_goal_costs[(goals[i-1],goals[i])]
+            solution_cost.append(path_cost)
+        return np.sum(solution_cost)
+    
+    def _get_cheapest_solution(self, possible_solutions, agent_goal_costs, goal_goal_costs):
+
+        cheapest_solution = None
+        cheapest_cost = np.inf
+        for solution in possible_solutions:
+            cost = self._calculate_cost_of_solution(solution=solution, agent_goal_costs=agent_goal_costs, goal_goal_costs=goal_goal_costs)
+            if cost < cheapest_cost:
+                cheapest_cost = cost
+                cheapest_solution = solution
+        return cheapest_solution
+    
 
     def get_normalized_skill_vectors_for_all_agents(self):
         all_skills_normalized = []
@@ -119,39 +236,76 @@ class Environment:
             all_skills_normalized.extend(goal_skills_normalized)
         return all_skills_normalized
 
-    # def visualize_state(self, iterations=1):
-    #     self.visualizer.run_step(self.agents, self.goals, iterations=iterations)
+    def add_random_goal(self, location=None):
+        if location is not None:
+            goal = Goal(location)
+        else:
+            goal = Goal(self.grid_map.random_valid_position())
+        self.goals.append(goal)
+        self.num_goals += 1
+        if self.num_skills == 1:
+            if goal.required_skills == []:
+                goal.add_skill(0)
+            return
+        amount_of_skills = np.random.randint(1, min(3,self.num_skills+1))
+        skills = []
+        for _ in range(amount_of_skills):
+            skill = np.random.randint(0, self.num_skills)
+            while skill in skills:
+                skill = np.random.randint(0, self.num_skills)
+            skills.append(skill)
+        goal.required_skills = skills
+        self.scheduler.reset()
+        self.planner.reset()
 
-    def random_agent_actions(self):
+    def add_random_obstacle_close_to_position(self,position):
+        pos = self.grid_map.random_valid_location_close_to_position(position, max_distance=1)
         for agent in self.agents:
-            agent.apply_action(self.controller.get_random_valid_action(agent))
+            if pos == agent.position:
+                return False
+        for goal in self.goals:
+            if pos == goal.position:
+                return False
+        grid_map_copy = copy.deepcopy(self.grid_map)
+        grid_map_copy.add_obstacle(pos)
+        if grid_map_copy.check_if_connected():
+            self.grid_map.add_obstacle(pos)
+            self.planner.reset()
+            self.controller.reset()
+            self.scheduler.reset()
+            return True
+        return False
+    
 
-    def assign_shortest_paths_for_scheduled_agents(self):
-        for agent in self.agents:
-            if agent in self.scheduler.goal_assignments:
-                agent_path = self.planner.generate_shortest_path_for_agent(agent, self.scheduler.get_goal_for_agent(agent))
-                self.planner.assign_path_to_agent(agent, agent_path)
+    def find_numerical_solution(self):
 
-    def advance_agents_on_paths(self):
-        for agent in self.agents:
-            if agent in self.planner.paths:
-                agent.apply_action(self.planner.get_move_to_reach_next_position(agent))
+        time_now = time.time()
+        print("Calculating paths from all agents to all goals...")
+        agent_goal_plans, agent_goal_costs = self._get_all_agent_to_goal_plans()
+        print(f"Found {len(agent_goal_plans)} agent to goal paths in {time.time()-time_now:.2f} seconds")
 
+        time_now = time.time()
+        print("Calculating paths between all goals...")
+        goal_goal_plans, goal_goal_costs = self._get_all_goal_to_goal_plans()
+        print(f"Found {len(goal_goal_plans)} goal to goal paths in {time.time()-time_now:.2f} seconds")
 
-# if __name__ == "__main__":
-#     env = Environment(width=20, height=20, num_agents=3, num_goals=3, num_obstacles=10, num_skills=2)
-#     env.scheduler.randomly_distribute_goals_to_agents()
-#     env.visualizer.set_assignments(env.scheduler.goal_assignments)
-#     env.assign_shortest_paths_for_scheduled_agents()
-
-#     done = False
-#     env.visualize_state()
-#     iterations = 0
-#     while not done:
-#         iterations += 1
-#         env.advance_agents_on_paths()
-#         env.scheduler.update_goal_statuses()
-#         env.visualize_state()
-#         done = env.scheduler.all_goals_claimed()
+        time_now = time.time()
+        print("Figuring out which combinations of agents solve each goal...")
+        goal_solutions = self._get_all_goal_solutions(agent_goal_plans=agent_goal_plans)
+        print(f"Found a total of {sum([len(v) for v in goal_solutions.values()])} goal solutions in {time.time()-time_now:.2f} seconds")
 
 
+        time_now = time.time()
+        print("Combining all single-goal solving agent-combinations to find all possible solutions to the full problem...")
+        possible_solutions = self._get_all_possible_solutions(goal_solutions=goal_solutions)
+        print(f"Found {len(possible_solutions)} possible solutions in {time.time()-time_now:.2f} seconds")
+
+        print("Finding cheapest solution...")
+        time_now = time.time()
+        cheapest_solution = self._get_cheapest_solution(possible_solutions=possible_solutions, agent_goal_costs=agent_goal_costs, goal_goal_costs=goal_goal_costs)    
+        print(f"Cheapest solution found in {time.time()-time_now:.2f} seconds")
+
+        return cheapest_solution
+    
+    def update(self):
+        return self.scheduler.update_goal_statuses()

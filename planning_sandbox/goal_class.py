@@ -8,11 +8,6 @@ class Goal:
 
     def add_skill(self, skill):
         self.required_skills.append(skill)
-
-    def get_required_skills(self):
-        if len(self.required_skills) == 0:
-            return None
-        return self.required_skills
     
     def claim(self):
         # print('Goal claimed')

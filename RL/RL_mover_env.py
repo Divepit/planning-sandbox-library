@@ -17,7 +17,7 @@ class RLEnv(gym.Env):
         self.obs_size = 0
 
         self.step_count = 0
-        self.max_steps = self.sandboxEnv.width * self.sandboxEnv.height
+        self.max_steps = self.sandboxEnv.size ** 2
         self.reward = 0
         self.total_reward = 0
         self.action_space = gym.spaces.MultiDiscrete([5]*(self.sandboxEnv.num_agents))
@@ -62,10 +62,10 @@ class RLEnv(gym.Env):
                 reward -= 100
                 done = True
                 self.episode_invalid_actions += 1
-            amount_of_claimed_goals += self.sandboxEnv.scheduler.update_goal_statuses()
+            amount_of_claimed_goals += self.sandboxEnv.update()
         
         reward += amount_of_claimed_goals*30
-        reward -= (self.step_count/self.max_steps)
+        reward -= 10*(self.step_count/self.max_steps)
                 
         done = done or (self.step_count >= self.max_steps) or self.sandboxEnv.scheduler.all_goals_claimed()
          
@@ -99,7 +99,7 @@ class RLEnv(gym.Env):
         self.normalized_goal_skill_vectors = self.sandboxEnv.get_normalized_skill_vectors_for_all_goals()
         self.normalized_agent_positions = self.sandboxEnv.grid_map.get_normalized_positions([agent.position for agent in self.sandboxEnv.agents])
         self.normalized_agent_skill_vectors = self.sandboxEnv.get_normalized_skill_vectors_for_all_agents()
-        self.normalized_claimed_goals_vector = self.sandboxEnv.scheduler._get_normalized_claimed_goals()
+        self.normalized_claimed_goals_vector = self.sandboxEnv.scheduler.get_normalized_claimed_goals()
         self.normalized_step_count = self.step_count / self.max_steps
 
         self.obs_size = (2*len(self.normalized_obstacle_positions) +

@@ -4,45 +4,9 @@ class Scheduler:
     def __init__(self, agents, goals):
         self.agents = agents
         self.goals = goals
+        self.unclaimed_goals = goals
         
         self.goal_assignments = {}
-
-    def reset(self):
-        self.goal_assignments = {}
-
-    def _assign_goal_to_agent(self, agent, goal):
-        self.goal_assignments[agent] = goal
-    
-    def _get_agent_for_goal(self, goal):
-        for agent, assigned_goal in self.goal_assignments.items():
-            if assigned_goal == goal:
-                return agent
-        return None
-    
-    def _get_unassigned_agents(self):
-        return [agent for agent in self.agents if agent not in self.goal_assignments]
-    
-    def _get_unassigned_goals(self):
-        return [goal for goal in self.goals if goal not in self.goal_assignments.values()]
-    
-    def _get_unclaimed_goals(self):
-        return [goal for goal in self.goals if not goal.claimed]
-    
-    def _get_unassigned_unclaimed_goals(self):
-        return [goal for goal in self._get_unclaimed_goals() if goal not in self.goal_assignments.values()]
-    
-    def _get_random_unassigned_unclaimed_goal(self):
-        unassigned_goals = self._get_unassigned_unclaimed_goals()
-        return np.random.choice(unassigned_goals)
-    
-    def _get_random_unassigned_agent(self):
-        unassigned_agents = self._get_unassigned_agents()
-        return np.random.choice(unassigned_agents)
-    
-    def _assign_random_unassigned_unclaimed_goal_to_random_unassigned_agent(self):
-        agent = self._get_random_unassigned_agent()
-        goal = self._get_random_unassigned_unclaimed_goal()
-        self._assign_goal_to_agent(agent, goal)
 
     def _get_agents_present_at_goal(self, goal):
         return [agent for agent in self.agents if agent.position == goal.position]
@@ -56,9 +20,7 @@ class Scheduler:
         for agent in agents:
             skills.extend(agent.skills)
         return skills
-    def randomly_distribute_goals_to_agents(self):
-        for _ in self.agents:
-            self._assign_random_unassigned_unclaimed_goal_to_random_unassigned_agent()
+
     
     def _goal_can_be_claimed(self, goal):
         skills_of_agents_present = self._get_skills_of_agents_present_at_goal(goal)
@@ -78,17 +40,31 @@ class Scheduler:
             # print(f"Goal at position {goal.position} can be claimed")
             goal.claim()
             amount_of_claimed_goals += 1
+        self.unclaimed_goals = [goal for goal in self.goals if not goal.claimed]
         return amount_of_claimed_goals
+    
+    def reset(self):
+        self.goal_assignments = {}
 
-    def _get_normalized_claimed_goals(self):
+    def assign_goal_to_agent(self, agent, goal):
+        if agent in self.goal_assignments:
+            self.goal_assignments[agent] = goal
+
+
+    def get_normalized_claimed_goals(self):
         # 1 if claimed, 0 if not
         return [int(goal.claimed) for goal in self.goals]
     
+    def get_allowed_goal_agent_pairs(self, goals, agents):
+        allowed_pairs = []
+        for agent in agents:
+            for goal in goals:
+                if self.agent_has_one_or_more_required_skills_for_goal(agent, goal):
+                    allowed_pairs.append((agent, goal))
+        return allowed_pairs
+    
     def all_goals_claimed(self):
         return all([goal.claimed for goal in self.goals])
-
-    def get_goal_for_agent(self, agent):
-        return self.goal_assignments[agent]
     
     def update_goal_statuses(self):
         amount_of_claimed_goals = 0
@@ -107,3 +83,9 @@ class Scheduler:
     
     def agent_has_one_or_more_required_skills_for_goal(self, agent, goal):
         return any([skill in agent.skills for skill in goal.required_skills])
+
+    def agent_combination_has_required_skills_for_goal(self, agents, goal):
+        skills = []
+        for agent in agents:
+            skills.extend(agent.skills)
+        return set(goal.required_skills).issubset(set(skills))

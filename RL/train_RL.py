@@ -1,4 +1,7 @@
+import sys
 import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import signal
 import torch
 from RL_mover_env import RLEnv
@@ -44,9 +47,9 @@ class TensorboardCallback(BaseCallback):
                 # self.logger.record("env/episode_reward", info['episode']['r'])
         return True
 
-def make_env(rank, num_agents, num_goals, num_obstacles, width, height, num_skills, seed=0):
+def make_env(rank, num_agents, num_goals, num_obstacles, size, num_skills, seed=0):
     def _init():
-        sandbox_env = Environment(width=width, height=height, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
+        sandbox_env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
         env = RLEnv(env=sandbox_env)
         env.reset(seed=seed + rank)
         return env
@@ -61,15 +64,14 @@ if __name__ == "__main__":
     print(f"Number of environments: {num_envs}")
 
     num_agents = 3
-    num_goals = 5
+    num_goals = 2
     num_obstacles = 0
-    width = 8
-    height = 8
-    num_skills = 2
-    max_steps = width * height
+    size = 12
+    num_skills = 1
+    max_steps = size**2
 
 
-    env = SubprocVecEnv([make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, width=width, height=height, num_skills=num_skills) for i in range(num_envs)])
+    env = SubprocVecEnv([make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, size=size, num_skills=num_skills) for i in range(num_envs)])
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=10.)
 
     log_dir = "./logs"
@@ -93,7 +95,7 @@ if __name__ == "__main__":
         tensorboard_log=log_dir,
     )
 
-    total_timesteps = 50000000
+    total_timesteps = 500000000
 
     try:
         model.learn(
