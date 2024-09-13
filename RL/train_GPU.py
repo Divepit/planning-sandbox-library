@@ -205,10 +205,10 @@ if __name__ == "__main__":
     logging.info(f"Using device: {device}")
 
     # Environment parameters
-    num_agents = 3
-    num_goals = 5
+    num_agents = 2
+    num_goals = 4
     num_obstacles = 0
-    size = 8
+    size = 12
     num_skills = 2
     max_steps = size**2
 
