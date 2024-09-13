@@ -82,7 +82,7 @@ if __name__ == "__main__":
         env,
         verbose=1,
         n_steps=2048,
-        batch_size=min(32768, num_envs * max_steps)
+        batch_size=min(32768, num_envs * max_steps),
         n_epochs=24,
         learning_rate=linear_schedule(0.0000075),
         clip_range=0.8,
