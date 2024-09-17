@@ -17,16 +17,18 @@ TEXT = (50, 50, 50)
 CELL_SIZE = 5
 
 class Visualizer:
-    def __init__(self, sandboxEnv, cell_size=CELL_SIZE):
+    def __init__(self, sandboxEnv, cell_size=CELL_SIZE, visualize=True):
         pygame.init()
-        self.sandboxEnv = sandboxEnv
-        self.cell_size = cell_size
-        self.size = sandboxEnv.size * self.cell_size
-        self.screen = pygame.display.set_mode((self.size, self.size))
-        pygame.display.set_caption("Modern Grid World")
-        self.font = pygame.font.Font(pygame.font.get_default_font(), 16)
-        self.debug_font = pygame.font.Font(pygame.font.get_default_font(), 12)
+        self.visualize = visualize
         self.assignments = {}
+        self.sandboxEnv = sandboxEnv
+        if self.visualize:
+            self.cell_size = cell_size
+            self.size = sandboxEnv.size * self.cell_size
+            self.screen = pygame.display.set_mode((self.size, self.size))
+            pygame.display.set_caption("Modern Grid World")
+            self.font = pygame.font.Font(pygame.font.get_default_font(), 16)
+            self.debug_font = pygame.font.Font(pygame.font.get_default_font(), 12)
 
         if sandboxEnv.grid_map.use_geo_data:
             self.elevation_surface = None
@@ -45,6 +47,8 @@ class Visualizer:
         return self.sandboxEnv.obstacles
 
     def update_elevation_surface(self):
+        if self.visualize == False:
+            return
         elevations = self.sandboxEnv.grid_map.downscaled_data
         
         # Normalize elevations to 0-255 range
@@ -74,6 +78,8 @@ class Visualizer:
         # print("colored elevations ", elevation_colors)
 
     def draw_grid(self):
+        if self.visualize == False:
+            return
         self.screen.fill(BACKGROUND)
         if self.sandboxEnv.grid_map.use_geo_data:
             self.screen.blit(self.elevation_surface, (0, 0))
@@ -83,10 +89,14 @@ class Visualizer:
             pygame.draw.line(self.screen, GRID_LINE, (0, y), (self.size, y))
 
     def draw_obstacles(self):
+        if self.visualize == False:
+            return
         for obstacle in self.obstacles:
             pygame.draw.rect(self.screen, OBSTACLE, (obstacle[0] * self.cell_size, obstacle[1] * self.cell_size, self.cell_size, self.cell_size))
 
     def draw_agents(self):
+        if self.visualize == False:
+            return
         for i, agent in enumerate(self.agents):
             x, y = agent.position
             center = (x * self.cell_size + self.cell_size // 2, y * self.cell_size + self.cell_size // 2)
@@ -99,6 +109,8 @@ class Visualizer:
             self.screen.blit(skills_text, (x * self.cell_size, y * self.cell_size + self.cell_size))
 
     def draw_goals(self):
+        if self.visualize == False:
+            return
         for i, goal in enumerate(self.goals):
             x, y = goal.position
             color = GOAL_CLAIMED if goal.claimed else GOAL_UNCLAIMED
@@ -111,6 +123,8 @@ class Visualizer:
             self.screen.blit(skills_text, (x * self.cell_size, y * self.cell_size + self.cell_size))
 
     def draw_assignments(self):
+        if self.visualize == False:
+            return
         for agent, goal in self.assignments.items():
             start = (agent.position[0] * self.cell_size + self.cell_size // 2,
                      agent.position[1] * self.cell_size + self.cell_size // 2)
@@ -119,6 +133,8 @@ class Visualizer:
             pygame.draw.line(self.screen, ASSIGNMENT, start, end, 2)
 
     def draw_paths(self):
+        if self.visualize == False:
+            return
         for agent in self.agents:
             if agent in self.sandboxEnv.planner.paths:
                 path = self.sandboxEnv.planner.paths[agent]
@@ -130,9 +146,13 @@ class Visualizer:
                     pygame.draw.line(self.screen, PATH, start, end, 2)
 
     def set_assignments(self, assignments):
+        if self.visualize == False:
+            return
         self.assignments = assignments
 
     def run_step(self, iterations=1, speed=20):
+        if self.visualize == False:
+            return
         done = False
         clock = pygame.time.Clock()
         i = 0
@@ -153,4 +173,6 @@ class Visualizer:
             i += 1
 
     def close(self):
+        if self.visualize == False:
+            return
         pygame.quit()

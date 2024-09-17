@@ -13,7 +13,7 @@ from planning_sandbox.goal_class import Goal
 
 def run_sim(env: Environment, speed, cell_size=30):
     
-    chance_of_adding_random_goal: float = 0.1
+    chance_of_adding_random_goal: float = 0.2
     chance_of_adding_random_obstacle: float = 0
     cell_size: int = cell_size
 
@@ -24,7 +24,7 @@ def run_sim(env: Environment, speed, cell_size=30):
     
     vis: Visualizer = Visualizer(env, cell_size=cell_size)
 
-    cheapest_solution = env.find_numerical_solution()
+    cheapest_solution = env.find_numerical_solution()[0]
 
     done: bool = False
     current_assignments: Dict[Goal, Agent] = {}
@@ -48,14 +48,14 @@ def run_sim(env: Environment, speed, cell_size=30):
         # random obstacle
         if np.random.rand() < chance_of_adding_random_obstacle:
             if env.add_random_obstacle_close_to_position(position=np.random.choice(env.agents).position):
-                cheapest_solution = env.find_numerical_solution()
+                cheapest_solution = env.find_numerical_solution()[0]
         
         # random goal
         if np.random.rand() < chance_of_adding_random_goal:
             if len(env.scheduler.unclaimed_goals) < max_goals-1:
-                location = env.grid_map.random_valid_location_close_to_position(position=np.random.choice(env.agents).position, max_distance=2000)
+                location = env.grid_map.random_valid_location_close_to_position(position=np.random.choice(env.agents).position, max_distance=5)
                 env.add_random_goal(location=location)
-                cheapest_solution = env.find_numerical_solution()
+                cheapest_solution = env.find_numerical_solution()[0]
 
         vis.run_step(speed=speed)
         done = env.scheduler.all_goals_claimed()
@@ -65,8 +65,8 @@ def run_sim(env: Environment, speed, cell_size=30):
         
 while True:
 
-    num_goals: int = 5
-    num_agents: int = 4
+    num_goals: int = 3
+    num_agents: int = 3
     size: int = 200
     num_obstacles: int = 0
     num_skills: int = 3

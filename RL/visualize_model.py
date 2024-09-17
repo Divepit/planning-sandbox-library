@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from planning_sandbox.environment_class import Environment
@@ -9,21 +10,27 @@ from planning_sandbox.visualiser_class import Visualizer
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 # Load the trained model
-try:
-    # model = PPO.load("ppo_custom_env_optimized_gpu")
-    model = PPO.load("ppo_custom_env_improved_goal_assignment")
-    # model = PPO.load("/Users/marco/Programming/PlanningEnvironmentLibrary/RL/saved_models/easy_test_2g")
-    print("Loaded trained model")
-except FileNotFoundError:
-    print("Trained model not found. Please make sure the model file exists.")
-    exit(1)
+
 
 def run_sim():
+    try:
+        while not os.path.exists("ppo_custom_env_improved_goal_assignment_intermediate.zip"):
+            pass
+        model = PPO.load("ppo_custom_env_improved_goal_assignment_intermediate")
+        # model = PPO.load("ppo_custom_env_optimized_gpu")
+        # model = PPO.load("/Users/marco/Programming/PlanningEnvironmentLibrary/RL/saved_models/easy_test_2g")
+        print("Loaded trained model")
+    except:
+        run_sim()
+        print("Trained model not found. Please make sure the model file exists.")
+    
+
     num_agents = 3
-    num_goals = 2
-    num_obstacles = 2
-    size = 10
-    num_skills = 2
+    num_goals = 5
+    num_obstacles = 0
+    size = 32
+    num_skills = 1
+    max_steps = size*3
 
 
     sandboxEnv = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)

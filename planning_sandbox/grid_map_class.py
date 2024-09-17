@@ -3,15 +3,16 @@ import numpy as np
 from PIL import Image
 from skimage.transform import resize
 
-TIF = '/Users/marco/Programming/PlanningEnvironmentLibrary/shoemaker_ele_5mpp.tif'
+TIF = '/Users/marco/Programming/PlanningEnvironmentLibrary/planning_sandbox/maps/shoemaker_ele_5mpp.tif'
 MPP = 5
-WINDOW_SIZE = 3800
+WINDOW_SIZE = 4000
 X_OFFSET = 0  # Change this to move the window horizontally
-Y_OFFSET = 200  # Change this to move the window vertically
+Y_OFFSET = 0  # Change this to move the window vertically
 ORIGINAL_TOP_LEFT = (X_OFFSET, Y_OFFSET)
 ORIGINAL_BOTTOM_RIGHT = (X_OFFSET + WINDOW_SIZE, Y_OFFSET + WINDOW_SIZE)
-TARGET_SIZE = 200 # SQUARE MAPS ONLY
+TARGET_SIZE = 4000 # SQUARE MAPS ONLY
 IS_SLOPE_DATA = False
+
 
 UPHILL_FACTOR = 1
 UPHILL_SLOPE_MAX = np.inf
@@ -102,6 +103,7 @@ class GridMap:
             return self.random_valid_location_close_to_position(position,max_distance)
         return (x,y)
     
+    
     def _print_tif_info(self,file_path):
         print("TIFF File Information:")
         print("-----------------------")
@@ -114,6 +116,9 @@ class GridMap:
             max_val = np.max(data)
             print(f"Min value: {min_val:.2f}")
             print(f"Max value: {max_val:.2f}")
+            
+        print("-----------------------")
+
     
     def _extract_data_from_tif(self):
         self._print_tif_info(TIF)

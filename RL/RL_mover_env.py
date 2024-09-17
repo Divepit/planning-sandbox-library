@@ -46,17 +46,17 @@ class RLEnv(gym.Env):
                     if self.sandboxEnv.scheduler.is_goal_position(agent.position):
                         goal_at_position = self.sandboxEnv.scheduler.get_goal_at_position(agent.position)
                         goal_already_claimed = goal_at_position.claimed
-                        if not goal_already_claimed:
-                            skill_match = self.sandboxEnv.scheduler.agent_has_one_or_more_required_skills_for_goal(agent, goal_at_position)
-                            if skill_match:
-                                self.episode_goal_stay_actions += 1
-                                reward += 2
-                            else:
-                                reward -= 0.25
-                        else:
-                            reward -= 0.5
-                    else:
-                        reward -= 0.75
+                    #     if not goal_already_claimed:
+                    #         skill_match = self.sandboxEnv.scheduler.agent_has_one_or_more_required_skills_for_goal(agent, goal_at_position)
+                    #         if skill_match:
+                    #             self.episode_goal_stay_actions += 1
+                    #             reward += 2
+                    #         else:
+                    #             reward -= 0.25
+                    #     else:
+                    #         reward -= 0.5
+                    # else:
+                    #     reward -= 0.75
                 agent.apply_action(agent_action)
             else:
                 reward -= 100
@@ -65,7 +65,7 @@ class RLEnv(gym.Env):
             amount_of_claimed_goals += self.sandboxEnv.update()
         
         reward += amount_of_claimed_goals*30
-        reward -= 10*(self.step_count/self.max_steps)
+        reward -= 2*(self.step_count/self.max_steps)
                 
         done = done or (self.step_count >= self.max_steps) or self.sandboxEnv.scheduler.all_goals_claimed()
          
@@ -93,24 +93,29 @@ class RLEnv(gym.Env):
         return self._get_obs(), {}
     
     def _update_obs_values(self):
-
+        
+        # self.normalized_grid = self.sandboxEnv.get_normalized_grid()
         self.normalized_obstacle_positions = self.sandboxEnv.grid_map.get_normalized_positions(self.sandboxEnv.grid_map.obstacles)
         self.normalized_goal_positions = self.sandboxEnv.grid_map.get_normalized_positions([goal.position for goal in self.sandboxEnv.goals])
-        self.normalized_goal_skill_vectors = self.sandboxEnv.get_normalized_skill_vectors_for_all_goals()
+        # self.normalized_goal_skill_vectors = self.sandboxEnv.get_normalized_skill_vectors_for_all_goals()
         self.normalized_agent_positions = self.sandboxEnv.grid_map.get_normalized_positions([agent.position for agent in self.sandboxEnv.agents])
-        self.normalized_agent_skill_vectors = self.sandboxEnv.get_normalized_skill_vectors_for_all_agents()
-        self.normalized_claimed_goals_vector = self.sandboxEnv.scheduler.get_normalized_claimed_goals()
-        self.normalized_step_count = self.step_count / self.max_steps
-
-        self.obs_size = (2*len(self.normalized_obstacle_positions) +
-                        2*len(self.normalized_goal_positions) +
-                        len(self.normalized_goal_skill_vectors) +
-                        2*len(self.normalized_agent_positions) +
-                        len(self.normalized_agent_skill_vectors) +
-                        len(self.normalized_claimed_goals_vector) +
-                        1)
+        # self.normalized_agent_skill_vectors = self.sandboxEnv.get_normalized_skill_vectors_for_all_agents()
         
-        self.observation_space = gym.spaces.Box(low=0, high=1, shape=(self.obs_size,), dtype=np.float32)
+        self.normalized_step_count = self.step_count / self.max_steps
+        # self.normalized_goals_unclaimed = len(self.sandboxEnv.scheduler.unclaimed_goals) / self.sandboxEnv.num_goals
+
+        self.obs_size = (
+                        # len(self.normalized_grid.flatten()) +
+                        2*len(self.normalized_obstacle_positions) +
+                        2*len(self.normalized_goal_positions) +
+                        # len(self.normalized_goal_skill_vectors) +
+                        2*len(self.normalized_agent_positions) +
+                        # len(self.normalized_agent_skill_vectors) +
+                        # 1 +
+                        1
+                        )
+        
+        self.observation_space = gym.spaces.Box(low=0, high=max(self.max_steps, self.sandboxEnv.size), shape=(self.obs_size,), dtype=np.float32)
 
     def _get_obs(self):
         self._update_obs_values()
@@ -118,32 +123,36 @@ class RLEnv(gym.Env):
         obs = np.zeros(self.obs_size, dtype=np.float32)
         offset = 0
 
-        for pos in self.normalized_obstacle_positions:
-            obs[offset] = pos[0]
-            obs[offset + 1] = pos[1]
-            offset += 2
-        
-        for pos in self.normalized_goal_positions:
-            obs[offset] = pos[0]
-            obs[offset + 1] = pos[1]
-            offset += 2
-        
-        obs[offset:offset+len(self.normalized_goal_skill_vectors)] = self.normalized_goal_skill_vectors
-        offset += len(self.normalized_goal_skill_vectors)
-        
-        for pos in self.normalized_agent_positions:
-            obs[offset] = pos[0]
-            obs[offset + 1] = pos[1]
-            offset += 2
-        
-        obs[offset:offset+len(self.normalized_agent_skill_vectors)] = self.normalized_agent_skill_vectors
-        offset += len(self.normalized_agent_skill_vectors)
-        
-        obs[offset:offset+len(self.normalized_claimed_goals_vector)] = self.normalized_claimed_goals_vector
-        offset += len(self.normalized_claimed_goals_vector)
+        # obs[offset:offset+len(self.normalized_grid.flatten())] = self.normalized_grid.flatten()
+        # offset += len(self.normalized_grid.flatten())
 
-        obs[offset] = self.normalized_step_count
+        for pos in self.sandboxEnv.obstacles:
+            obs[offset] = pos[0]
+            obs[offset + 1] = pos[1]
+            offset += 2
+        
+        for goal in self.sandboxEnv.goals:
+            obs[offset] = goal.position[0]
+            obs[offset + 1] = goal.position[1]
+            offset += 2
+        
+        # obs[offset:offset+len(self.normalized_goal_skill_vectors)] = self.normalized_goal_skill_vectors
+        # offset += len(self.normalized_goal_skill_vectors)
+        
+        for agent in self.sandboxEnv.agents:
+            obs[offset] = agent.position[0]
+            obs[offset + 1] = agent.position[1]
+            offset += 2
+        
+        # obs[offset:offset+len(self.normalized_agent_skill_vectors)] = self.normalized_agent_skill_vectors
+        # offset += len(self.normalized_agent_skill_vectors)
+        
+
+        obs[offset] = self.step_count
         offset += 1
+
+        # obs[offset] = self.normalized_goals_unclaimed
+        # offset += 1
         
         assert offset == self.obs_size, f"Observation size mismatch: {offset} vs {self.obs_size}"
         

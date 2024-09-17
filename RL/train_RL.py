@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import signal
@@ -16,8 +17,6 @@ def linear_schedule(initial_value: float):
         return progress_remaining * initial_value
     return func
 
-
-
 class EarlyStoppingCallback(BaseCallback):
     def __init__(self, verbose=0):
         super(EarlyStoppingCallback, self).__init__(verbose)
@@ -32,19 +31,28 @@ class EarlyStoppingCallback(BaseCallback):
         return not self.should_stop
 
 class TensorboardCallback(BaseCallback):
-    def __init__(self, verbose=0):
+    def __init__(self, save_freq=200000, verbose=0):
         super().__init__(verbose)
         self.episode_rewards = []
+        self.save_freq = save_freq
+        self.last_save = 0
 
     def _on_step(self) -> bool:
         for info in self.locals['infos']:
             if 'episode' in info:
                 self.episode_rewards.append(info['episode']['r'])
-                self.logger.record("env/claimed_goals", info['episode']['claimed_goals']) 
-                self.logger.record("env/invalid_actions", info['episode']['invalid_actions']) 
+                self.logger.record("env/claimed_goals", info['episode']['claimed_goals'])
+                self.logger.record("env/invalid_actions", info['episode']['invalid_actions'])
                 self.logger.record("env/stay_actions", info['episode']['stay_actions'])
                 self.logger.record("env/goal_stay_actions", info['episode']['goal_stay_actions'])
-                # self.logger.record("env/episode_reward", info['episode']['r'])
+        
+        # Check if it's time to save the model
+        if self.num_timesteps - self.last_save >= self.save_freq:
+            model_path = f"ppo_custom_env_improved_goal_assignment_intermediate"
+            self.model.save(model_path)
+            print(f"Model saved at {model_path}")
+            self.last_save = self.num_timesteps
+
         return True
 
 def make_env(rank, num_agents, num_goals, num_obstacles, size, num_skills, seed=0):
@@ -64,11 +72,11 @@ if __name__ == "__main__":
     print(f"Number of environments: {num_envs}")
 
     num_agents = 3
-    num_goals = 2
+    num_goals = 5
     num_obstacles = 0
-    size = 12
+    size = 32
     num_skills = 1
-    max_steps = size**2
+    max_steps = size*3
 
 
     env = SubprocVecEnv([make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, size=size, num_skills=num_skills) for i in range(num_envs)])
@@ -100,7 +108,7 @@ if __name__ == "__main__":
     try:
         model.learn(
             total_timesteps=total_timesteps,
-            callback=[EarlyStoppingCallback(), TensorboardCallback()],
+            callback=[EarlyStoppingCallback(), TensorboardCallback(save_freq=10000)],
             progress_bar=True
         )
     except KeyboardInterrupt:

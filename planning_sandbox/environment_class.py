@@ -12,6 +12,7 @@ from planning_sandbox.goal_class import Goal
 from planning_sandbox.controller_class import Controller
 from planning_sandbox.scheduler_class import Scheduler
 from planning_sandbox.planner_class import Planner
+from planning_sandbox.benchmark_class import Benchmark
 # from visualiser_class import Visualizer
 
 import numpy as np
@@ -24,6 +25,13 @@ class Environment:
         self.num_goals = num_goals
         self.num_obstacles = num_obstacles
         self.num_skills = num_skills
+
+        print( "=== Environment settings ===")
+        print("Num agents: ", num_agents)
+        print("Num goals: ", num_goals)
+        print("Num skills: ", num_skills)
+        print("Map size: ", size)
+        print("=== === === === === === ===")
 
 
         self.grid_map = GridMap(self.size, num_obstacles, use_geo_data=use_geo_data)
@@ -279,33 +287,54 @@ class Environment:
 
     def find_numerical_solution(self):
 
-        time_now = time.time()
+        agent_goal_bench = Benchmark("agent_to_goal", start_now=True)
         print("Calculating paths from all agents to all goals...")
         agent_goal_plans, agent_goal_costs = self._get_all_agent_to_goal_plans()
-        print(f"Found {len(agent_goal_plans)} agent to goal paths in {time.time()-time_now:.2f} seconds")
+        agent_goal_bench.stop()
 
-        time_now = time.time()
+        goal_goal_bench = Benchmark("goal_to_goal", start_now=True)
         print("Calculating paths between all goals...")
         goal_goal_plans, goal_goal_costs = self._get_all_goal_to_goal_plans()
-        print(f"Found {len(goal_goal_plans)} goal to goal paths in {time.time()-time_now:.2f} seconds")
+        goal_goal_bench.stop()
 
-        time_now = time.time()
+        goal_solutions_bench = Benchmark("goal_solutions", start_now=True)
         print("Figuring out which combinations of agents solve each goal...")
         goal_solutions = self._get_all_goal_solutions(agent_goal_plans=agent_goal_plans)
-        print(f"Found a total of {sum([len(v) for v in goal_solutions.values()])} goal solutions in {time.time()-time_now:.2f} seconds")
+        goal_solutions_bench.stop()
 
 
-        time_now = time.time()
+        possible_solutions_bench = Benchmark("possible_solutions", start_now=True)
         print("Combining all single-goal solving agent-combinations to find all possible solutions to the full problem...")
         possible_solutions = self._get_all_possible_solutions(goal_solutions=goal_solutions)
-        print(f"Found {len(possible_solutions)} possible solutions in {time.time()-time_now:.2f} seconds")
+        possible_solutions_bench.stop()
 
+        cheapest_solution_bench = Benchmark("cheapest_solution", start_now=True)
         print("Finding cheapest solution...")
-        time_now = time.time()
         cheapest_solution = self._get_cheapest_solution(possible_solutions=possible_solutions, agent_goal_costs=agent_goal_costs, goal_goal_costs=goal_goal_costs)    
-        print(f"Cheapest solution found in {time.time()-time_now:.2f} seconds")
+        cheapest_solution_bench.stop()
 
-        return cheapest_solution
+        print("===================== Found solution =====================")
+
+        return cheapest_solution, agent_goal_bench, goal_goal_bench, goal_solutions_bench, possible_solutions_bench, cheapest_solution_bench 
     
     def update(self):
         return self.scheduler.update_goal_statuses()
+    
+    def get_normalized_grid(self):
+        # use the graph
+        # empty positions = 0
+        # obstacle positions = 1
+        # agent positions = 0.5
+        # goal positions = 0.75
+
+        grid = np.zeros((self.size, self.size))
+        for obstacle in self.obstacles:
+            grid[obstacle] = 1
+        
+        for agent in self.agents:
+            grid[agent.position] = 0.5
+
+        for goal in self.goals:
+            grid[goal.position] = 0.75
+
+        return grid
