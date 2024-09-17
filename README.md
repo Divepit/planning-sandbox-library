@@ -17,8 +17,8 @@ This project implements a multi-agent planning and reinforcement learning enviro
 
 1. Clone the repository:
    ```
-   git clone https://github.com/your-username/your-repo-name.git
-   cd your-repo-name
+   git clone git@github.com:Divepit/planning-sandbox-library.git
+   cd planning-sandbox-library
    ```
 
 2. Create a virtual environment (optional but recommended):
@@ -51,8 +51,9 @@ This project implements a multi-agent planning and reinforcement learning enviro
   - `train_GPU.py`: GPU-accelerated training script
   - `train_RL.py`: CPU training script
   - `visualize_model.py`: Script to visualize trained models
-- `numerical_solving_benchmark.py`: Benchmarking script for numerical solutions
-- `numerical_solving.py`: Implementation of numerical solving methods
+- `BruteForce/`: Numerical Solving / Combinatorially Solving the Problem
+  - `numerical_solving_benchmark.py`: Benchmarking script for numerical solutions
+  - `numerical_solving.py`: Implementation of numerical solving methods
 
 ## Usage
 
@@ -61,7 +62,7 @@ This project implements a multi-agent planning and reinforcement learning enviro
 To run the numerical solving simulation:
 
 ```
-python numerical_solving.py
+python BruteForce/numerical_solving.py
 ```
 
 This will initialize the environment and run the simulation using the numerical solving approach.
@@ -93,7 +94,7 @@ python RL/visualize_model.py
 To run benchmarks and generate performance metrics:
 
 ```
-python numerical_solving_benchmark.py
+python BruteForce/numerical_solving_benchmark.py
 ```
 
 This will generate benchmark results and save them as CSV files and plots.
