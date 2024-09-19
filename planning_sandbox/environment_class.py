@@ -2,7 +2,6 @@ from typing import List, Dict, Tuple
 
 import networkx as nx
 import copy
-import time
 
 
 from itertools import combinations, permutations, product

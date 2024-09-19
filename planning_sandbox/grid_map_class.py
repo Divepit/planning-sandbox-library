@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image
 from skimage.transform import resize
 
-TIF = './maps/shoemaker_ele_5mpp.tif'
+TIF = '/Users/marco/Programming/PlanningEnvironmentLibrary/planning_sandbox/maps/shoemaker_ele_5mpp.tif'
 MPP = 5
 WINDOW_SIZE = 4000
 X_OFFSET = 0  # Change this to move the window horizontally

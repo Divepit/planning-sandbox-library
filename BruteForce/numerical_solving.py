@@ -62,23 +62,27 @@ def run_sim(env: Environment, speed, cell_size=30):
         if done:
             print("All goals claimed!")
             break
-        
-while True:
 
-    num_goals: int = 3
-    num_agents: int = 3
-    size: int = 200
-    num_obstacles: int = 0
-    num_skills: int = 3
-    cell_size: int = int(1000/size)
-    speed: int = 60
+def main():
+    while True:
 
-    print("Number of agents: ", num_agents)
-    print("Number of goals: ", num_goals)
-    print("Number of skills: ", num_skills)
-    print("Map size (n x n), n = ", size)
+        num_goals: int = 3
+        num_agents: int = 10
+        size: int = 200
+        num_obstacles: int = 0
+        num_skills: int = 1
+        cell_size: int = int(1000/size)
+        speed: int = 60
 
-    env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
+        print("Number of agents: ", num_agents)
+        print("Number of goals: ", num_goals)
+        print("Number of skills: ", num_skills)
+        print("Map size (n x n), n = ", size)
 
-    run_sim(env=env, speed=speed, cell_size=cell_size)
-    env.reset()
+        env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
+
+        run_sim(env=env, speed=speed, cell_size=cell_size)
+        env.reset()
+
+if __name__ == "__main__":
+    main()
