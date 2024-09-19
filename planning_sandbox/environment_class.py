@@ -3,7 +3,6 @@ from typing import List, Dict, Tuple
 import networkx as nx
 import copy
 
-
 from itertools import combinations, permutations, product
 from planning_sandbox.grid_map_class import GridMap
 from planning_sandbox.agent_class import Agent
@@ -12,7 +11,6 @@ from planning_sandbox.controller_class import Controller
 from planning_sandbox.scheduler_class import Scheduler
 from planning_sandbox.planner_class import Planner
 from planning_sandbox.benchmark_class import Benchmark
-# from visualiser_class import Visualizer
 
 import numpy as np
 
