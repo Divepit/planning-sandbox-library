@@ -59,9 +59,13 @@ class GridMap:
     
     def reset(self):
         self.obstacles.clear()
-        if not self.use_geo_data:
-            self.graph = None
+        self.graph = None
+        self.is_connected = False
+        if self.use_geo_data:
+            self.create_directed_graph(data=self.downscaled_data, is_slope_data=IS_SLOPE_DATA, pixel_size=self.pixel_size, uphill_factor=UPHILL_FACTOR, downhill_slope_max=DOWNHILL_SLOPE_MAX, uphill_slope_max=UPHILL_SLOPE_MAX)
+        else:
             self._generate_connected_grid_with_obstalces(self.num_obstacles)
+
 
     def add_obstacle(self, pos):
         self.obstacles.append(pos)

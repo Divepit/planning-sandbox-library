@@ -23,6 +23,11 @@ class Environment:
         self.num_obstacles = num_obstacles
         self.num_skills = num_skills
 
+        self.initial_num_agents = num_agents
+        self.initial_num_goals = num_goals
+        self.initial_num_obstacles = num_obstacles
+        self.initial_num_skills = num_skills
+
         print( "=== Environment settings ===")
         print("Num agents: ", num_agents)
         print("Num goals: ", num_goals)
@@ -105,26 +110,57 @@ class Environment:
         inform_agents_of_costs_bench.stop()
 
     def reset(self):
+        self.num_agents = self.initial_num_agents
+        self.num_goals = self.initial_num_goals
+        self.num_obstacles = self.initial_num_obstacles
+        self.num_skills = self.initial_num_skills
+
 
         self.grid_map.reset()
+        self.obstacles = self.grid_map.obstacles
+        self.starting_position = self.grid_map.random_valid_position()
+        
+        
+        self.goals.clear()
+        self._initialize_goals()
 
-        for agent in self.agents:
-            agent.reset(self.grid_map.random_valid_position())
-            # self.grid_map.add_occupied_position(agent.position)
+        self.agents.clear()
+        self._initialize_agents()
 
-        for goal in self.goals:
-            goal.reset(self.grid_map.random_valid_position())
-            # self.grid_map.add_occupied_position(goal.position)
+        self.normalized_skill_map = {i: i / self.num_skills for i in range(self.num_skills)}
+        
+        while not self._all_skills_represented():
+            self._reset_skills()
+            self._initialize_skills()
 
 
+        self.controller.reset()
         self.planner.reset()
         self.scheduler.reset()
-        self.controller.reset()
 
-        self._initialize_skills()
         self._inform_agents_of_costs_to_goals()
         self._inform_goals_of_agents()
         self._inform_goals_of_costs_to_other_goals()
+
+        # self.grid_map.reset()
+
+        # for agent in self.agents:
+        #     agent.reset(self.grid_map.random_valid_position())
+        #     # self.grid_map.add_occupied_position(agent.position)
+
+        # for goal in self.goals:
+        #     goal.reset(self.grid_map.random_valid_position())
+        #     # self.grid_map.add_occupied_position(goal.position)
+
+
+        # self.planner.reset()
+        # self.scheduler.reset()
+        # self.controller.reset()
+
+        # self._initialize_skills()
+        # self._inform_agents_of_costs_to_goals()
+        # self._inform_goals_of_agents()
+        # self._inform_goals_of_costs_to_other_goals()
 
     def _initialize_skills(self):
         # assign 1 or 2 skills to each goal

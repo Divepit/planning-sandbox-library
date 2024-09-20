@@ -11,6 +11,7 @@ from planning_sandbox.environment_class import Environment
 from planning_sandbox.visualiser_class import Visualizer
 from planning_sandbox.agent_class import Agent
 from planning_sandbox.goal_class import Goal        
+from planning_sandbox.benchmark_class import Benchmark
 
 def run_sim(env: Environment, speed, cell_size=30):
 
@@ -29,8 +30,9 @@ def run_sim(env: Environment, speed, cell_size=30):
 
     done: bool = False
     current_assignments: Dict[Goal, Agent] = {}
-
+    steps = 0
     while not done:
+        steps += 1
         if cheapest_solution is None:
             continue
         for agent, goal_list in cheapest_solution.items():
@@ -75,29 +77,41 @@ def run_sim(env: Environment, speed, cell_size=30):
         vis.run_step(speed=speed)
         done = env.scheduler.all_goals_claimed()
         if done:
+            vis.close()
             print("All goals claimed!")
             break
+    return steps
 
-def main():
-    while True:
+def main(iterations = np.inf):
+    runtimes = []
+    all_steps = []
+    i = 0
+    num_goals: int = 8
+    num_agents: int = 3
+    size: int = 32
+    num_obstacles: int = 0
+    num_skills: int = 2
+    cell_size: int = int(1000/size)
+    speed: int = 60
 
-        num_goals: int = 20
-        num_agents: int = 3
-        size: int = 40
-        num_obstacles: int = 0
-        num_skills: int = 1
-        cell_size: int = int(1000/size)
-        speed: int = 5
+    print("Number of agents: ", num_agents)
+    print("Number of goals: ", num_goals)
+    print("Number of skills: ", num_skills)
+    print("Map size (n x n), n = ", size)
 
-        print("Number of agents: ", num_agents)
-        print("Number of goals: ", num_goals)
-        print("Number of skills: ", num_skills)
-        print("Map size (n x n), n = ", size)
+    env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
 
-        env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
-
-        run_sim(env=env, speed=speed, cell_size=cell_size)
+    while i < iterations:
+        i += 1
+        bench = Benchmark('numerical_solving',start_now=True)
+        steps = run_sim(env=env, speed=speed, cell_size=cell_size)
+        bench.stop()
+        runtimes.append(bench.elapsed_time)
+        all_steps.append(steps)
         env.reset()
+    print(f"Average runtime: {np.mean(runtimes)}")
+    print(f"Average steps: {np.mean(all_steps)}")
 
 if __name__ == "__main__":
-    cProfile.run('main()', sort='cumtime')
+    # cProfile.run('main()', sort='cumtime')
+    main(iterations=10)
