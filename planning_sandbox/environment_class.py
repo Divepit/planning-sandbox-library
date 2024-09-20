@@ -17,11 +17,18 @@ import numpy as np
 class Environment:
     def __init__(self, size, num_agents, num_goals, num_obstacles, num_skills, use_geo_data=False):
         self.size = size
+        self.use_geo_data = use_geo_data
 
         self.num_agents = num_agents
         self.num_goals = num_goals
         self.num_obstacles = num_obstacles
         self.num_skills = num_skills
+
+        self.initial_agents = num_agents
+        self.initial_goals = num_goals
+        self.initial_obstacles = num_obstacles
+        self.initial_skills = num_skills
+
 
         print( "=== Environment settings ===")
         print("Num agents: ", num_agents)
@@ -72,23 +79,31 @@ class Environment:
             self.goals.append(goal)
 
     def reset(self):
+        self.num_agents = self.initial_agents
+        self.num_goals = self.initial_goals
+        self.num_obstacles = self.initial_obstacles
+        self.num_skills = self.initial_skills
 
         self.grid_map.reset()
+        self.obstacles = self.grid_map.obstacles
+        self.starting_position = self.grid_map.random_valid_position()
 
-        for agent in self.agents:
-            agent.reset(self.grid_map.random_valid_position())
-            # self.grid_map.add_occupied_position(agent.position)
-
-        for goal in self.goals:
-            goal.reset(self.grid_map.random_valid_position())
-            # self.grid_map.add_occupied_position(goal.position)
+        self.agents.clear()
+        self._initialize_agents()
 
 
+        self.goals.clear()
+        self._initialize_goals()
+
+        self.normalized_skill_map = {i: i / self.num_skills for i in range(self.num_skills)}
+        
+        while not self._all_skills_represented():
+            self._reset_skills()
+            self._initialize_skills()
+
+        self.controller.reset()
         self.planner.reset()
         self.scheduler.reset()
-        self.controller.reset()
-
-        self._initialize_skills()
 
     def _initialize_skills(self):
         # assign 1 or 2 skills to each goal

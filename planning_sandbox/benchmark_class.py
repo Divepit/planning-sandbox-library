@@ -23,4 +23,5 @@ class Benchmark:
         self.end_time = time.time()
         self.elapsed_time = self.end_time - self.start_time
         print(f"{self.description} took {self.elapsed_time:.2f} seconds")
+        return self.elapsed_time
         

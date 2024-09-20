@@ -10,6 +10,7 @@ from planning_sandbox.environment_class import Environment
 from planning_sandbox.visualiser_class import Visualizer
 from planning_sandbox.agent_class import Agent
 from planning_sandbox.goal_class import Goal        
+from planning_sandbox.benchmark_class import Benchmark
 
 def run_sim(env: Environment, speed, cell_size=30):
     
@@ -29,7 +30,10 @@ def run_sim(env: Environment, speed, cell_size=30):
     done: bool = False
     current_assignments: Dict[Goal, Agent] = {}
 
+    steps = 0
+
     while not done and cheapest_solution:
+        steps += 1
         if cheapest_solution is None:
             continue
         for agent, goal_list in cheapest_solution.items():
@@ -62,27 +66,40 @@ def run_sim(env: Environment, speed, cell_size=30):
         if done:
             print("All goals claimed!")
             break
+        
+    return steps
 
-def main():
-    while True:
+def main(iterations= np.inf):
+    i = 0
 
-        num_goals: int = 3
-        num_agents: int = 10
-        size: int = 200
-        num_obstacles: int = 0
-        num_skills: int = 1
-        cell_size: int = int(1000/size)
-        speed: int = 60
+    num_goals: int = 3
+    num_agents: int = 5
+    size: int = 200
+    num_obstacles: int = 0
+    num_skills: int = 1
+    cell_size: int = int(1000/size)
+    speed: int = 60
 
-        print("Number of agents: ", num_agents)
-        print("Number of goals: ", num_goals)
-        print("Number of skills: ", num_skills)
-        print("Map size (n x n), n = ", size)
+    print("Number of agents: ", num_agents)
+    print("Number of goals: ", num_goals)
+    print("Number of skills: ", num_skills)
+    print("Map size (n x n), n = ", size)
 
-        env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
+    env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
 
-        run_sim(env=env, speed=speed, cell_size=cell_size)
+    all_steps = []
+    all_durations = []
+
+    while i < iterations:
+        i += 1
+        bench = Benchmark('numerical_bench', start_now=True)
+        steps = run_sim(env=env, speed=speed, cell_size=cell_size)
+        duration = bench.stop()
+        all_steps.append(steps)
+        all_durations.append(duration)
         env.reset()
+    print(f"Average steps: {np.mean(all_steps)}")
+    print(f"Average duration: {np.mean(all_durations)}")
 
 if __name__ == "__main__":
-    main()
+    main(iterations=10)

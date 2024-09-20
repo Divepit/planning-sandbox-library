@@ -44,7 +44,8 @@ class Scheduler:
         return amount_of_claimed_goals
     
     def reset(self):
-        self.goal_assignments = {}
+        self.goal_assignments.clear()
+        self.unclaimed_goals = self.goals
 
     def assign_goal_to_agent(self, agent, goal):
         if agent in self.goal_assignments:
