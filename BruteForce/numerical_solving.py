@@ -5,6 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Dict
 
 import numpy as np
+import cProfile
 
 from planning_sandbox.environment_class import Environment
 from planning_sandbox.visualiser_class import Visualizer
@@ -12,8 +13,8 @@ from planning_sandbox.agent_class import Agent
 from planning_sandbox.goal_class import Goal        
 
 def run_sim(env: Environment, speed, cell_size=30):
-    
-    chance_of_adding_random_goal: float = 0.2
+
+    chance_of_adding_random_goal: float = 0
     chance_of_adding_random_obstacle: float = 0
     cell_size: int = cell_size
 
@@ -24,12 +25,12 @@ def run_sim(env: Environment, speed, cell_size=30):
     
     vis: Visualizer = Visualizer(env, cell_size=cell_size)
 
-    cheapest_solution = env.find_numerical_solution()[0]
+    cheapest_solution = env.find_numerical_solution()
 
     done: bool = False
     current_assignments: Dict[Goal, Agent] = {}
 
-    while not done and cheapest_solution:
+    while not done:
         if cheapest_solution is None:
             continue
         for agent, goal_list in cheapest_solution.items():
@@ -44,18 +45,32 @@ def run_sim(env: Environment, speed, cell_size=30):
             agent.apply_action(env.planner.get_move_to_reach_next_position(agent))
 
         env.update()
+        env._inform_agents_of_costs_to_goals()
+        env._inform_goals_of_agents()
+        cheapest_solution = env.find_numerical_solution()
+
+        # if env.update() > 0:
+        #     cheapest_solution = env.find_numerical_solution()
+
+        if not cheapest_solution:
+            print("No solution found")
 
         # random obstacle
         if np.random.rand() < chance_of_adding_random_obstacle:
             if env.add_random_obstacle_close_to_position(position=np.random.choice(env.agents).position):
-                cheapest_solution = env.find_numerical_solution()[0]
+                env._inform_agents_of_costs_to_goals()
+                env._inform_goals_of_agents()
+                cheapest_solution = env.find_numerical_solution()
         
         # random goal
         if np.random.rand() < chance_of_adding_random_goal:
             if len(env.scheduler.unclaimed_goals) < max_goals-1:
                 location = env.grid_map.random_valid_location_close_to_position(position=np.random.choice(env.agents).position, max_distance=5)
                 env.add_random_goal(location=location)
-                cheapest_solution = env.find_numerical_solution()[0]
+                env._inform_goals_of_costs_to_other_goals()
+                env._inform_agents_of_costs_to_goals()
+                env._inform_goals_of_agents()
+                cheapest_solution = env.find_numerical_solution()
 
         vis.run_step(speed=speed)
         done = env.scheduler.all_goals_claimed()
@@ -66,13 +81,13 @@ def run_sim(env: Environment, speed, cell_size=30):
 def main():
     while True:
 
-        num_goals: int = 3
-        num_agents: int = 10
-        size: int = 200
+        num_goals: int = 20
+        num_agents: int = 3
+        size: int = 40
         num_obstacles: int = 0
         num_skills: int = 1
         cell_size: int = int(1000/size)
-        speed: int = 60
+        speed: int = 5
 
         print("Number of agents: ", num_agents)
         print("Number of goals: ", num_goals)
@@ -85,4 +100,4 @@ def main():
         env.reset()
 
 if __name__ == "__main__":
-    main()
+    cProfile.run('main()', sort='cumtime')

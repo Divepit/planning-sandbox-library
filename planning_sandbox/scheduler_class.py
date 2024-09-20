@@ -64,7 +64,7 @@ class Scheduler:
         return allowed_pairs
     
     def all_goals_claimed(self):
-        return all([goal.claimed for goal in self.goals])
+        return len(self.unclaimed_goals) == 0
     
     def update_goal_statuses(self):
         amount_of_claimed_goals = 0
