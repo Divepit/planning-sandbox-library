@@ -32,7 +32,6 @@ def run_sim(env: Environment, speed, cell_size=30):
     current_assignments: Dict[Goal, Agent] = {}
     steps = 0
     while not done:
-        steps += 1
         if cheapest_solution is None:
             continue
         for agent, goal_list in cheapest_solution.items():
@@ -45,6 +44,7 @@ def run_sim(env: Environment, speed, cell_size=30):
                 env.planner.assign_shortest_path_for_goal_to_agent(agent=agent, goal=goal_list[i])
                 break
             agent.apply_action(env.planner.get_move_to_reach_next_position(agent))
+            steps += 1
 
         env.update()
         env._inform_agents_of_costs_to_goals()
@@ -83,14 +83,11 @@ def run_sim(env: Environment, speed, cell_size=30):
     return steps
 
 def main(iterations = np.inf):
-    runtimes = []
-    all_steps = []
-    i = 0
-    num_goals: int = 8
+    num_goals: int = 10
     num_agents: int = 3
     size: int = 32
     num_obstacles: int = 0
-    num_skills: int = 2
+    num_skills: int = 1
     cell_size: int = int(1000/size)
     speed: int = 60
 
@@ -100,6 +97,10 @@ def main(iterations = np.inf):
     print("Map size (n x n), n = ", size)
 
     env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
+
+    runtimes = []
+    all_steps = []
+    i = 0
 
     while i < iterations:
         i += 1
