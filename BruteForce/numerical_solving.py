@@ -14,7 +14,7 @@ from planning_sandbox.benchmark_class import Benchmark
 
 def run_sim(env: Environment, speed, cell_size=30):
     
-    chance_of_adding_random_goal: float = 0.2
+    chance_of_adding_random_goal: float = 0
     chance_of_adding_random_obstacle: float = 0
     cell_size: int = cell_size
 
@@ -33,7 +33,6 @@ def run_sim(env: Environment, speed, cell_size=30):
     steps = 0
 
     while not done and cheapest_solution:
-        steps += 1
         if cheapest_solution is None:
             continue
         for agent, goal_list in cheapest_solution.items():
@@ -46,6 +45,7 @@ def run_sim(env: Environment, speed, cell_size=30):
                 env.planner.assign_shortest_path_for_goal_to_agent(agent=agent, goal=goal_list[i])
                 break
             agent.apply_action(env.planner.get_move_to_reach_next_position(agent))
+            steps += 1
 
         env.update()
 
@@ -66,15 +66,15 @@ def run_sim(env: Environment, speed, cell_size=30):
         if done:
             print("All goals claimed!")
             break
-        
+    vis.close()
     return steps
 
 def main(iterations= np.inf):
     i = 0
 
-    num_goals: int = 3
-    num_agents: int = 5
-    size: int = 200
+    num_goals: int = 8
+    num_agents: int = 3
+    size: int = 32
     num_obstacles: int = 0
     num_skills: int = 1
     cell_size: int = int(1000/size)
