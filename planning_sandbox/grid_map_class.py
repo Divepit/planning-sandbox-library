@@ -1,5 +1,6 @@
 import networkx as nx
 import numpy as np
+import time
 from PIL import Image
 from skimage.transform import resize
 
@@ -18,8 +19,16 @@ UPHILL_FACTOR = 1
 UPHILL_SLOPE_MAX = np.inf
 DOWNHILL_SLOPE_MAX = np.inf
 
+FLAT_MAP_FOR_TESTING = False
+
 class GridMap:
     def __init__(self, size, num_obstacles, use_geo_data=False):
+        if FLAT_MAP_FOR_TESTING:
+            print("========= ATTENTION =========")
+            print("Using flat map for testing")
+            print("========= ATTENTION =========")
+            time.sleep(5)
+
         self.size = size
         self.num_obstacles = num_obstacles
         self.obstacles = []
@@ -162,39 +171,33 @@ class GridMap:
         np.set_printoptions(linewidth=100000)  # Adjust the value as needed    
         height, width = data.shape
         G = nx.DiGraph()
+        if FLAT_MAP_FOR_TESTING:
+            data = np.zeros((height, width))
         for i in range(height):
             for j in range(width):
                 node = (i, j)
                 node_elevation = data[i, j]
                 neighbors = [(i-1, j), (i+1, j), (i, j-1), (i, j+1)]
-                if is_slope_data:
-                    weight = 0
-                    G.add_node(node, weight=node_elevation)
-                    for ni, nj in neighbors:
-                        if 0 <= ni < height and 0 <= nj < width:
-                            neighbor_node = (ni, nj)
-                            neighbor_elevation = data[ni, nj]
-                            G.add_edge(node, neighbor_node, weight=neighbor_elevation)
-                else:
-                    for ni, nj in neighbors:
-                        if 0 <= ni < height and 0 <= nj < width:
-                            neighbor_node = (ni, nj)
-                            neighbor_elevation = data[ni, nj]
-                            elevation_diff = neighbor_elevation - node_elevation
-                            slope = elevation_diff / pixel_size
-                            if elevation_diff > 0:  # Uphill
-                                if slope > uphill_slope_max:
-                                    weight = np.inf
-                                else:
-                                    weight = slope * uphill_factor
-                            else:  # Downhill or flat
-                                if abs(slope) > downhill_slope_max:
-                                    weight = np.inf
-                                else:
-                                    weight = abs(slope)
-                            # Add edge to graph
-                            G.add_edge(node, neighbor_node, weight=weight)
-                            # G.nodes[neighbor_node]["elevation"] = neighbor_elevation
+                for ni, nj in neighbors:
+                    if 0 <= ni < height and 0 <= nj < width:
+                        neighbor_node = (ni, nj)
+                        neighbor_elevation = data[ni, nj]
+                        elevation_diff = neighbor_elevation - node_elevation
+                        slope = elevation_diff / pixel_size
+                        if elevation_diff > 0:  # Uphill
+                            if slope > uphill_slope_max:
+                                weight = np.inf
+                            else:
+                                weight = slope * uphill_factor
+                        else:  # Downhill or flat
+                            if abs(slope) > downhill_slope_max:
+                                weight = np.inf
+                            else:
+                                weight = abs(slope)
+                        # Add edge to graph
+                        if FLAT_MAP_FOR_TESTING:
+                            weight = MPP
+                        G.add_edge(node, neighbor_node, weight=weight)
         for i in range(height):
             for j in range(width):
                 node = (i, j)

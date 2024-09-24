@@ -27,14 +27,19 @@ class Goal:
         if position is not None:
             self.position = position
 
+    def soft_reset(self):
+        self.agents_which_have_required_skills.clear()
+        self.agent_combinations_which_solve_goal.clear()
+        self.cheapest_combination = (None,np.inf)
+        
     def add_agent_which_has_required_skills(self, agent):
         self.agents_which_have_required_skills.append(agent)
-        self.append_agent_combinations_which_solve_goal(agent)
+        
 
     def add_cost_to_reach_other_goal(self, goal, cost):
         self.cost_to_reach_other_goals[goal] = cost
 
-    def append_agent_combinations_which_solve_goal(self, new_agent):
+    def generate_agent_combinations_which_solve_goal(self):
         for r in range(1, len(self.agents_which_have_required_skills)+1):
             new_combinations = combinations(self.agents_which_have_required_skills, r)
             for combination in new_combinations:
@@ -44,8 +49,6 @@ class Goal:
                         if self in agent.costs_to_reach_goals:
                             combination_cost += agent.costs_to_reach_goals[self]
                     self.agent_combinations_which_solve_goal[combination] = combination_cost
-                    if combination_cost < self.cheapest_combination[1]:
-                        self.cheapest_combination = (combination, combination_cost)
         
 
                 

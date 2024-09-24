@@ -38,7 +38,8 @@ class Planner:
     def generate_shortest_path_for_agent(self, agent, goal):
         current_agent_goal = self._get_agent_current_goal(agent)
         if current_agent_goal is not None and current_agent_goal == goal.position:
-            return self.paths[agent]
+            path_index = self._get_current_index_on_path(agent)
+            return self.paths[agent][path_index:]
         start = agent.position
         goal = goal.position
         path = self.grid_map.shortest_path(start, goal)

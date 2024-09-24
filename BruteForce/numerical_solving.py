@@ -14,7 +14,7 @@ from planning_sandbox.goal_class import Goal
 from planning_sandbox.benchmark_class import Benchmark
 
 def run_sim(env: Environment, speed, cell_size=30):
-
+    setup_bench = Benchmark('setup',start_now=True)
     chance_of_adding_random_goal: float = 0
     chance_of_adding_random_obstacle: float = 0
     cell_size: int = cell_size
@@ -31,8 +31,13 @@ def run_sim(env: Environment, speed, cell_size=30):
     done: bool = False
     current_assignments: Dict[Goal, Agent] = {}
     steps = 0
+    setup_bench.stop()
     while not done:
-        if cheapest_solution is None:
+        bench_step = Benchmark('step',start_now=True, silent=True)
+        replan_required = False
+
+        if cheapest_solution is None or not cheapest_solution:
+            bench_step.stop()
             continue
         for agent, goal_list in cheapest_solution.items():
             for i, goal in enumerate(goal_list):
@@ -46,55 +51,50 @@ def run_sim(env: Environment, speed, cell_size=30):
             agent.apply_action(env.planner.get_move_to_reach_next_position(agent))
             steps += 1
 
-        env.update()
-        env._inform_agents_of_costs_to_goals()
-        env._inform_goals_of_agents()
-        cheapest_solution = env.find_numerical_solution()
-
-        # if env.update() > 0:
-        #     cheapest_solution = env.find_numerical_solution()
-
-        if not cheapest_solution:
-            print("No solution found")
+        replan_required = env.update() > 0
 
         # random obstacle
         if np.random.rand() < chance_of_adding_random_obstacle:
-            if env.add_random_obstacle_close_to_position(position=np.random.choice(env.agents).position):
-                env._inform_agents_of_costs_to_goals()
-                env._inform_goals_of_agents()
-                cheapest_solution = env.find_numerical_solution()
+            env.add_random_obstacle_close_to_position(position=np.random.choice(env.agents).position)
+            replan_required = True
         
         # random goal
         if np.random.rand() < chance_of_adding_random_goal:
             if len(env.scheduler.unclaimed_goals) < max_goals-1:
-                location = env.grid_map.random_valid_location_close_to_position(position=np.random.choice(env.agents).position, max_distance=5)
+                location = env.grid_map.random_valid_location_close_to_position(position=np.random.choice(env.agents).position, max_distance=20)
                 env.add_random_goal(location=location)
                 env._inform_goals_of_costs_to_other_goals()
-                env._inform_agents_of_costs_to_goals()
-                env._inform_goals_of_agents()
-                cheapest_solution = env.find_numerical_solution()
+                replan_required = True
+
+        if replan_required:
+            bench_replan = Benchmark('replanning',start_now=True, silent=True)
+            env._connect_agents_and_goals()
+            cheapest_solution = env.find_numerical_solution()
+            bench_replan.stop()
+        
 
         vis.run_step(speed=speed)
         done = env.scheduler.all_goals_claimed()
         if done:
             vis.close()
             print("All goals claimed!")
+            bench_step.stop()
             break
+        bench_step.stop()
+        if replan_required:
+            print(f"Replanning took {bench_step.elapsed_time:.2f} seconds")
     return steps
 
 def main(iterations = np.inf):
+    setup_bench = Benchmark('setup',start_now=True)
     num_goals: int = 10
     num_agents: int = 3
-    size: int = 32
+    size: int = 200
     num_obstacles: int = 0
     num_skills: int = 1
     cell_size: int = int(1000/size)
-    speed: int = 60
-
-    print("Number of agents: ", num_agents)
-    print("Number of goals: ", num_goals)
-    print("Number of skills: ", num_skills)
-    print("Map size (n x n), n = ", size)
+    velocity = 200 #m/s (max 200)
+    speed = velocity*1/5
 
     env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
 
@@ -102,12 +102,13 @@ def main(iterations = np.inf):
     all_steps = []
     i = 0
 
+    setup_bench.stop()
+
     while i < iterations:
         i += 1
         bench = Benchmark('numerical_solving',start_now=True)
         steps = run_sim(env=env, speed=speed, cell_size=cell_size)
-        bench.stop()
-        runtimes.append(bench.elapsed_time)
+        runtimes.append(bench.stop())
         all_steps.append(steps)
         env.reset()
     print(f"Average runtime: {np.mean(runtimes)}")
