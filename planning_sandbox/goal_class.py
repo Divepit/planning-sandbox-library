@@ -1,12 +1,16 @@
 import numpy as np
+
+from typing import List
 from itertools import combinations
+
+from planning_sandbox.agent_class import Agent
 
 class Goal:
     def __init__(self, position):
         self.position = position
         self.required_skills = []
         self.claimed = False
-        self.agents_which_have_required_skills = []
+        self.agents_which_have_required_skills: List[Agent] = []
         self.agent_combinations_which_solve_goal = {}
         self.cost_to_reach_other_goals = {}
         self.cheapest_combination = (None,np.inf)
@@ -15,7 +19,6 @@ class Goal:
         self.required_skills.append(skill)
     
     def claim(self):
-        # print('Goal claimed')
         self.claimed = True 
 
     def reset(self, position=None):
@@ -34,7 +37,6 @@ class Goal:
         
     def add_agent_which_has_required_skills(self, agent):
         self.agents_which_have_required_skills.append(agent)
-        
 
     def add_cost_to_reach_other_goal(self, goal, cost):
         self.cost_to_reach_other_goals[goal] = cost

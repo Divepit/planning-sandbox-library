@@ -1,5 +1,5 @@
-import numpy as np
 from planning_sandbox.grid_map_class import GridMap
+from planning_sandbox.agent_class import Agent
 
 class Controller:
     def __init__(self, grid_map):
@@ -14,14 +14,8 @@ class Controller:
             4: 'down'
         }
 
-    def _get_valid_actions(self, agent):
-        valid_actions = []
-        for action in self.action_map.values():
-            if self.validate_action(agent=agent, action=action):
-                valid_actions.append(action)
-        return valid_actions
 
-    def validate_action(self, agent, action):
+    def validate_action(self, agent: Agent, action):
         position = agent.position
         if action == 'left' or action == 1:
             position = (position[0] - 1, position[1])

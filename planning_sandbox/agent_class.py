@@ -47,8 +47,6 @@ class Agent:
             self._stay()
         else:
             raise ValueError("Invalid action: " + str(action))
-        
-        
     
     def add_skill(self, skill):
         self.skills.append(skill)

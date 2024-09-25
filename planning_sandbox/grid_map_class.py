@@ -38,7 +38,7 @@ class GridMap:
         if self.use_geo_data:
             self.data = self._extract_data_from_tif()
             self.downscaled_data, self.pixel_size = self._downscale_data()
-            self.create_directed_graph(data=self.downscaled_data, is_slope_data=IS_SLOPE_DATA, pixel_size=self.pixel_size, uphill_factor=UPHILL_FACTOR, downhill_slope_max=DOWNHILL_SLOPE_MAX, uphill_slope_max=UPHILL_SLOPE_MAX)
+            self.create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=UPHILL_FACTOR, downhill_slope_max=DOWNHILL_SLOPE_MAX, uphill_slope_max=UPHILL_SLOPE_MAX)
         else:
             self._generate_connected_grid_with_obstalces(self.num_obstacles)
 
@@ -71,7 +71,7 @@ class GridMap:
         self.graph = None
         self.is_connected = False
         if self.use_geo_data:
-            self.create_directed_graph(data=self.downscaled_data, is_slope_data=IS_SLOPE_DATA, pixel_size=self.pixel_size, uphill_factor=UPHILL_FACTOR, downhill_slope_max=DOWNHILL_SLOPE_MAX, uphill_slope_max=UPHILL_SLOPE_MAX)
+            self.create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=UPHILL_FACTOR, downhill_slope_max=DOWNHILL_SLOPE_MAX, uphill_slope_max=UPHILL_SLOPE_MAX)
         else:
             self._generate_connected_grid_with_obstalces(self.num_obstacles)
 
@@ -79,10 +79,6 @@ class GridMap:
     def add_obstacle(self, pos):
         self.obstacles.append(pos)
         self.graph.remove_node(pos)
-
-    def remove_obstacle(self, pos):
-        self.obstacles.remove(pos)
-        self.graph.add_node(pos)
     
     def is_valid_position(self, pos):
         return (0 <= pos[0] < self.size and 
@@ -167,7 +163,7 @@ class GridMap:
         if nx.is_connected(self.graph):
             return True
     
-    def create_directed_graph(self,data, is_slope_data, pixel_size, uphill_factor, downhill_slope_max, uphill_slope_max):
+    def create_directed_graph(self, data, pixel_size, uphill_factor, downhill_slope_max, uphill_slope_max):
         np.set_printoptions(linewidth=100000)  # Adjust the value as needed    
         height, width = data.shape
         G = nx.DiGraph()

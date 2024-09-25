@@ -1,6 +1,10 @@
+from typing import Dict, List
 import pygame
-import math
 import numpy as np
+
+from planning_sandbox.environment_class import Environment
+from planning_sandbox.agent_class import Agent
+from planning_sandbox.goal_class import Goal
 
 # Colors
 BACKGROUND = (240, 240, 240)
@@ -20,17 +24,17 @@ class Visualizer:
     def __init__(self, sandboxEnv, cell_size=CELL_SIZE, visualize=True):
         pygame.init()
         self.visualize = visualize
-        self.assignments = {}
-        self.sandboxEnv = sandboxEnv
+        self.assignments: Dict[Agent, Goal] = {}
+        self.sandboxEnv: Environment = sandboxEnv
         if self.visualize:
             self.cell_size = cell_size
-            self.size = sandboxEnv.size * self.cell_size
+            self.size = self.sandboxEnv.size * self.cell_size
             self.screen = pygame.display.set_mode((self.size, self.size))
             pygame.display.set_caption("Modern Grid World")
             self.font = pygame.font.Font(pygame.font.get_default_font(), 16)
             self.debug_font = pygame.font.Font(pygame.font.get_default_font(), 12)
 
-        if sandboxEnv.grid_map.use_geo_data:
+        if self.sandboxEnv.grid_map.use_geo_data:
             self.elevation_surface = None
             self.update_elevation_surface()
 
@@ -61,8 +65,7 @@ class Visualizer:
         # Create a surface with the same size as the grid
         self.elevation_surface = pygame.Surface((self.size, self.size))
 
-        # print(self.size)
-        # Draw the elevation colors onto the surface
+
         for y in range(self.sandboxEnv.size):
             for x in range(self.sandboxEnv.size):
                 color_value = elevation_colors[y, x]
@@ -70,12 +73,6 @@ class Visualizer:
                 pygame.draw.rect(self.elevation_surface, color, 
                                 (x * self.cell_size, y * self.cell_size, 
                                 self.cell_size, self.cell_size))
-        
-        # # You can remove or comment out these print statements in the final version
-        # print("elevations ", elevations)
-        # print("positive elevations ", positive_elevations)
-        # print("normalized elevations ", normalized_elevations)
-        # print("colored elevations ", elevation_colors)
 
     def draw_grid(self):
         if self.visualize == False:
