@@ -41,6 +41,7 @@ def run_sim(env: Environment, speed, cell_size=30):
             print("No solution found")
             bench_step.stop()
             continue
+        print(f"Cheapest solution: {cheapest_solution}")
         for agent, goal_list in cheapest_solution.items():
             for i, goal in enumerate(goal_list):
                 if goal.claimed:
@@ -92,7 +93,7 @@ def run_sim(env: Environment, speed, cell_size=30):
 
 def main(iterations = np.inf):
     setup_bench = Benchmark('setup',start_now=True)
-    num_goals: int = 15
+    num_goals: int = 5
     num_agents: int = 3
     size: int = 100
     num_obstacles: int = 0
