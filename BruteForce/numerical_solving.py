@@ -33,10 +33,12 @@ def run_sim(env: Environment, speed, cell_size=30):
     steps = 0
     setup_bench.stop()
     while not done:
+        # print(f"Step {steps}")
         bench_step = Benchmark('step',start_now=True, silent=True)
         replan_required = False
 
         if cheapest_solution is None or not cheapest_solution:
+            print("No solution found")
             bench_step.stop()
             continue
         for agent, goal_list in cheapest_solution.items():
@@ -59,16 +61,19 @@ def run_sim(env: Environment, speed, cell_size=30):
             replan_required = True
         
         # random goal
+        new_goal = False
         if np.random.rand() < chance_of_adding_random_goal:
             if len(env.scheduler.unclaimed_goals) < max_goals-1:
                 location = env.grid_map.random_valid_location_close_to_position(position=np.random.choice(env.agents).position, max_distance=20)
                 env.add_random_goal(location=location)
-                env._inform_goals_of_costs_to_other_goals()
+                new_goal = True
                 replan_required = True
 
         if replan_required:
             bench_replan = Benchmark('replanning',start_now=True, silent=True)
             env._connect_agents_and_goals()
+            if new_goal:
+                env._inform_goals_of_costs_to_other_goals()
             cheapest_solution = env.find_numerical_solution()
             bench_replan.stop()
         
@@ -87,9 +92,9 @@ def run_sim(env: Environment, speed, cell_size=30):
 
 def main(iterations = np.inf):
     setup_bench = Benchmark('setup',start_now=True)
-    num_goals: int = 10
+    num_goals: int = 15
     num_agents: int = 3
-    size: int = 200
+    size: int = 100
     num_obstacles: int = 0
     num_skills: int = 1
     cell_size: int = int(1000/size)
