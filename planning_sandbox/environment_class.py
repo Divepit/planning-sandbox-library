@@ -15,8 +15,10 @@ from planning_sandbox.benchmark_class import Benchmark
 import numpy as np
 
 class Environment:
-    def __init__(self, size, num_agents, num_goals, num_obstacles, num_skills, use_geo_data=False):
+    def __init__(self, size, num_agents, num_goals, num_obstacles, num_skills, use_geo_data=False, solve_type="fast"):
         self.size = size
+
+        self.solve_type = solve_type
 
         self.num_agents = num_agents
         self.num_goals = num_goals
@@ -61,8 +63,9 @@ class Environment:
         self.planner = Planner(self.agents, self.grid_map)
         self.scheduler = Scheduler(self.agents, self.goals)
 
-        self._connect_agents_and_goals()
-        self._inform_goals_of_costs_to_other_goals()
+        if self.solve_type == "fast":
+            self._connect_agents_and_goals()
+            self._inform_goals_of_costs_to_other_goals()
         
     def _initialize_agents(self):
         if self.starting_position is not None:
@@ -148,8 +151,9 @@ class Environment:
         self.planner.reset()
         self.scheduler.reset()
 
-        self._connect_agents_and_goals()
-        self._inform_goals_of_costs_to_other_goals()
+        if self.solve_type == "fast":
+            self._connect_agents_and_goals()
+            self._inform_goals_of_costs_to_other_goals()
 
 
     def _initialize_skills(self):
@@ -263,7 +267,39 @@ class Environment:
             return True
         return False
     
-    def find_numerical_solution(self):
+    def find_bruteforce_solution(self):
+
+        agent_goal_bench = Benchmark("agent_to_goal", start_now=True)
+        print("Calculating paths from all agents to all goals...")
+        agent_goal_plans, agent_goal_costs = self._get_all_agent_to_goal_plans()
+        agent_goal_bench.stop()
+
+        goal_goal_bench = Benchmark("goal_to_goal", start_now=True)
+        print("Calculating paths between all goals...")
+        goal_goal_plans, goal_goal_costs = self._get_all_goal_to_goal_plans()
+        goal_goal_bench.stop()
+
+        goal_solutions_bench = Benchmark("goal_solutions", start_now=True)
+        print("Figuring out which combinations of agents solve each goal...")
+        goal_solutions = self._get_all_goal_solutions(agent_goal_plans=agent_goal_plans)
+        goal_solutions_bench.stop()
+
+
+        possible_solutions_bench = Benchmark("possible_solutions", start_now=True)
+        print("Combining all single-goal solving agent-combinations to find all possible solutions to the full problem...")
+        possible_solutions = self._get_all_possible_solutions(goal_solutions=goal_solutions)
+        possible_solutions_bench.stop()
+
+        cheapest_solution_bench = Benchmark("cheapest_solution", start_now=True)
+        print("Finding cheapest solution...")
+        cheapest_solution = self._get_cheapest_solution(possible_solutions=possible_solutions, agent_goal_costs=agent_goal_costs, goal_goal_costs=goal_goal_costs)    
+        cheapest_solution_bench.stop()
+
+        print("===================== Found solution =====================")
+
+        return cheapest_solution, agent_goal_bench, goal_goal_bench, goal_solutions_bench, possible_solutions_bench, cheapest_solution_bench 
+    
+    def find_fast_solution(self):
         cheapest_combinations = {} # goal: (combination, cost)
         cheapest_solution = {} # agent: [goal]
         unaccounted_for_goals = set(self.scheduler.unclaimed_goals)
@@ -313,6 +349,11 @@ class Environment:
 
         return cheapest_solution
 
+    def find_numerical_solution(self):
+        if self.solve_type == "optimal":
+            return self.find_bruteforce_solution()
+        elif self.solve_type == "fast":
+            return self.find_fast_solution()
 
     def update(self):
         return self.scheduler.update_goal_statuses()

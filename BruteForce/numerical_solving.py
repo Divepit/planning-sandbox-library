@@ -101,7 +101,7 @@ def main(iterations = np.inf):
     velocity = 200 #m/s (max 200)
     speed = velocity*1/5
 
-    env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
+    env: Environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True, solve_type='optimal')
 
     runtimes = []
     all_steps = []
