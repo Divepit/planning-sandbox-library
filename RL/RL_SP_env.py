@@ -3,9 +3,6 @@ import numpy as np
 import copy
 
 from planning_sandbox.environment_class import Environment
-from planning_sandbox.controller_class import Controller
-from planning_sandbox.scheduler_class import Scheduler
-from planning_sandbox.goal_class import Goal
 
 
 class RLEnv(gym.Env):
@@ -20,7 +17,7 @@ class RLEnv(gym.Env):
         self.max_steps = self.sandboxEnv.width * self.sandboxEnv.height
         self.reward = 0
         self.total_reward = 0
-        self.action_space = gym.spaces.MultiDiscrete([self.sandboxEnv.num_goals-1]*(self.sandboxEnv.num_agents))
+        self.action_space = gym.spaces.MultiDiscrete([len(self.sandboxEnv.goals)-1]*len(self.sandboxEnv.agents))
         # [goal_to_claim_for_agent_1, goal_to_claim_for_agent_2, ..., goal_to_claim_for_agent_n]
         # 1 - move up, 2 - move down, 3 - move left, 4 - move right, 0 - stay
 
@@ -41,7 +38,7 @@ class RLEnv(gym.Env):
             goal = self.sandboxEnv.goals[actions[i]]
             path = self.sandboxEnv.planner.generate_shortest_path_for_agent(agent, goal)
             self.sandboxEnv.planner.assign_path_to_agent(agent, path)
-            agent_action = self.sandboxEnv.planner.get_move_to_reach_next_position(agent)
+            agent_action, action_cost = self.sandboxEnv.planner.get_move_and_cost_to_reach_next_position(agent)
             action_is_valid = self.sandboxEnv.controller.validate_action(agent, agent_action)
             if action_is_valid:
                 if agent_action == 0 or agent_action == 'stay':

@@ -20,9 +20,7 @@ class RLEnv(gym.Env):
         self.max_steps = self.sandboxEnv.size ** 2
         self.reward = 0
         self.total_reward = 0
-        self.action_space = gym.spaces.MultiDiscrete([5]*(self.sandboxEnv.num_agents))
-        # [action_of_agent_1, action_of_agent_2, ..., action_of_agent_n]
-        # 1 - move up, 2 - move down, 3 - move left, 4 - move right, 0 - stay
+        self.action_space = gym.spaces.MultiDiscrete([5]*(len(self.sandboxEnv.agents)))
 
         self._update_obs_values()
 
@@ -102,7 +100,7 @@ class RLEnv(gym.Env):
         # self.normalized_agent_skill_vectors = self.sandboxEnv.get_normalized_skill_vectors_for_all_agents()
         
         self.normalized_step_count = self.step_count / self.max_steps
-        # self.normalized_goals_unclaimed = len(self.sandboxEnv.scheduler.unclaimed_goals) / self.sandboxEnv.num_goals
+        # self.normalized_goals_unclaimed = len(self.sandboxEnv.scheduler.unclaimed_goals) / len(self.sandboxEnv.goals)
 
         self.obs_size = (
                         # len(self.normalized_grid.flatten()) +

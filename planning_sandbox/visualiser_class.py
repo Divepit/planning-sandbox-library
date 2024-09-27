@@ -6,6 +6,11 @@ from planning_sandbox.environment_class import Environment
 from planning_sandbox.agent_class import Agent
 from planning_sandbox.goal_class import Goal
 
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # Required for 3D plotting
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+
 # Colors
 BACKGROUND = (240, 240, 240)
 GRID_LINE = (100, 100, 100)
@@ -21,9 +26,10 @@ TEXT = (50, 50, 50)
 CELL_SIZE = 5
 
 class Visualizer:
-    def __init__(self, sandboxEnv, cell_size=CELL_SIZE, visualize=True):
+    def __init__(self, sandboxEnv, cell_size=CELL_SIZE, visualize=True, show_3d_elevation=False):
         pygame.init()
         self.visualize = visualize
+        self.show_3d_elevation = show_3d_elevation
         self.assignments: Dict[Agent, Goal] = {}
         self.sandboxEnv: Environment = sandboxEnv
         if self.visualize:
@@ -50,29 +56,77 @@ class Visualizer:
     def obstacles(self):
         return self.sandboxEnv.obstacles
 
+    # Function for coloration and 3D map created by ChatGPT (https://chatgpt.com/share/66f66db2-2750-8008-a104-700c5c92cfa9)
     def update_elevation_surface(self):
-        if self.visualize == False:
+        if not self.visualize:
             return
+
         elevations = self.sandboxEnv.grid_map.downscaled_data
-        
-        # Normalize elevations to 0-255 range
+
+        # Normalize elevations between 0 and 1 for colormap
         min_elevation = np.min(elevations)
-        positive_elevations = elevations + abs(min_elevation)
-        max_elevation = np.max(positive_elevations)
-        normalized_elevations = (positive_elevations / max_elevation)
-        elevation_colors = (normalized_elevations * 255).astype(np.uint8)
-        
+        max_elevation = np.max(elevations)
+        normalized_elevations = (elevations - min_elevation) / (max_elevation - min_elevation)
+
+        # Get the 'terrain' colormap from Matplotlib
+        colormap = cm.get_cmap('terrain')
+
         # Create a surface with the same size as the grid
         self.elevation_surface = pygame.Surface((self.size, self.size))
 
-
         for y in range(self.sandboxEnv.size):
             for x in range(self.sandboxEnv.size):
-                color_value = elevation_colors[y, x]
-                color = (color_value, color_value, color_value)  # Grayscale color
-                pygame.draw.rect(self.elevation_surface, color, 
-                                (x * self.cell_size, y * self.cell_size, 
-                                self.cell_size, self.cell_size))
+                elevation = normalized_elevations[y, x]
+                # Get the RGBA color from the colormap
+                rgba_color = colormap(elevation)
+                # Convert RGBA to RGB tuple in 0-255 range
+                rgb_color = tuple(int(255 * c) for c in rgba_color[:3])
+                pygame.draw.rect(
+                    self.elevation_surface,
+                    rgb_color,
+                    (
+                        x * self.cell_size,
+                        y * self.cell_size,
+                        self.cell_size,
+                        self.cell_size,
+                    ),
+                )
+
+        if self.show_3d_elevation:
+            self.display_3d_elevation()
+
+
+
+    def display_3d_elevation(self):
+        elevations = self.sandboxEnv.grid_map.downscaled_data
+        size = elevations.shape[0]
+        
+        # Create coordinate grids
+        x = np.arange(0, size)
+        y = np.arange(0, size)
+        x, y = np.meshgrid(x, y)
+        
+        # Create a figure and a 3D Axes
+        fig = plt.figure(figsize=(10, 7))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Rotate 90 degrees around z
+        ax.view_init(elev=40, azim=200)
+        
+        # Plot the surface with a colormap
+        surface = ax.plot_surface(x, y, elevations, cmap='terrain', linewidth=0, antialiased=False)
+        
+        # Add a color bar to map colors to elevation values
+        fig.colorbar(surface, shrink=0.5, aspect=10)
+        
+        # Set labels and title
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Elevation')
+        ax.set_title('3D Elevation Map')
+        
+        # Show the plot
+        plt.show(block=False)
 
     def draw_grid(self):
         if self.visualize == False:

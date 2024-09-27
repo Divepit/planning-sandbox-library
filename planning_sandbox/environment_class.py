@@ -3,7 +3,6 @@ from typing import List, Dict, Tuple
 import networkx as nx
 import copy
 
-from itertools import combinations, permutations, product
 from planning_sandbox.grid_map_class import GridMap
 from planning_sandbox.agent_class import Agent
 from planning_sandbox.goal_class import Goal
@@ -20,8 +19,6 @@ class Environment:
 
         self.solve_type = solve_type
 
-        self.num_agents = num_agents
-        self.num_goals = num_goals
         self.num_obstacles = num_obstacles
         self.num_skills = num_skills
 
@@ -37,8 +34,7 @@ class Environment:
         print("Map size: ", size)
         print("=== === === === === === ===")
 
-
-        self.grid_map = GridMap(self.size, num_obstacles, use_geo_data=use_geo_data)
+        self.grid_map = GridMap(self.size, num_obstacles=num_obstacles, use_geo_data=use_geo_data)
         self.obstacles = self.grid_map.obstacles
         self.starting_position = self.grid_map.random_valid_position()
         
@@ -61,27 +57,26 @@ class Environment:
         self.planner = Planner(self.agents, self.grid_map)
         self.scheduler = Scheduler(agents=self.agents, goals=self.goals)
 
-        if self.solve_type == "fast":
-            self._connect_agents_and_goals()
-            self._inform_goals_of_costs_to_other_goals()
+        self._connect_agents_and_goals()
+        self._inform_goals_of_costs_to_other_goals()
         
     def _initialize_agents(self):
         if self.starting_position is not None:
             start_pos = self.starting_position
         else:
             start_pos = self.grid_map.random_valid_position()
-        for _ in range(self.num_agents):
+        for _ in range(self.initial_num_agents):
             agent = Agent(start_pos)
             self.agents.append(agent)
 
     def _initialize_goals(self):
-        for _ in range(self.num_goals):
+        for _ in range(self.initial_num_goals):
             random_position = self.grid_map.random_valid_position()
             goal = Goal(random_position)
             self.goals.append(goal)
 
     def _connect_agents_and_goals(self):
-        inform_goals_of_agents_bench = Benchmark("inform_goals_of_agents", start_now=True)
+        inform_goals_of_agents_bench = Benchmark("inform_goals_of_agents", start_now=True, silent=True)
         for goal in self.scheduler.unclaimed_goals:
             goal.soft_reset()
             for agent in self.agents:
@@ -89,40 +84,38 @@ class Environment:
                     goal.add_agent_which_has_required_skills(agent)
         inform_goals_of_agents_bench.stop()
 
-        inform_agents_of_costs_bench = Benchmark("inform_agents_of_costs_to_goals", start_now=True)
+        inform_agents_of_costs_bench = Benchmark("inform_agents_of_costs_to_goals", start_now=True, silent=True)
         for goal in self.scheduler.unclaimed_goals:
             for agent in goal.agents_which_have_required_skills:
                     path = self.planner.generate_shortest_path_for_agent(agent, goal)
-                    cost = self._calculate_path_cost(path)
-                    agent.add_cost_to_reach_goal(goal, cost)
+                    cost = self.planner._calculate_path_cost(path)
+                    agent.add_path_to_goal(goal, path, cost)
         inform_agents_of_costs_bench.stop()
 
         for goal in self.scheduler.unclaimed_goals:
             goal.generate_agent_combinations_which_solve_goal()
 
     def _inform_goals_of_costs_to_other_goals(self):
-        inform_goals_of_costs_bench = Benchmark("inform_goals_of_costs_to_other_goals", start_now=True)
+        inform_goals_of_costs_bench = Benchmark("inform_goals_of_costs_to_other_goals", start_now=True, silent=True)
         for goal in self.scheduler.unclaimed_goals:
             for other_goal in self.goals:
                 if goal == other_goal:
                     continue
 
-                if not other_goal in goal.cost_to_reach_other_goals:
+                if not other_goal in goal.paths_and_costs_to_other_goals:
                     path = self.grid_map.shortest_path(goal.position, other_goal.position)
-                    cost = self._calculate_path_cost(path)
-                    goal.add_cost_to_reach_other_goal(other_goal, cost)
+                    cost = self.planner._calculate_path_cost(path)
+                    goal.add_path_to_other_goal(other_goal, path, cost)
 
-                if not goal in other_goal.cost_to_reach_other_goals:
+                if not goal in other_goal.paths_and_costs_to_other_goals:
                     path = self.grid_map.shortest_path(other_goal.position, goal.position)
-                    cost = self._calculate_path_cost(path)
-                    other_goal.add_cost_to_reach_other_goal(goal, cost)
+                    cost = self.planner._calculate_path_cost(path)
+                    other_goal.add_path_to_other_goal(goal, path, cost)
 
 
         inform_goals_of_costs_bench.stop()        
 
     def reset(self):
-        self.num_agents = self.initial_num_agents
-        self.num_goals = self.initial_num_goals
         self.num_obstacles = self.initial_num_obstacles
         self.num_skills = self.initial_num_skills
 
@@ -149,9 +142,8 @@ class Environment:
         self.planner.reset()
         self.scheduler.reset()
 
-        if self.solve_type == "fast":
-            self._connect_agents_and_goals()
-            self._inform_goals_of_costs_to_other_goals()
+        self._connect_agents_and_goals()
+        self._inform_goals_of_costs_to_other_goals()
 
 
     def _initialize_skills(self):
@@ -202,10 +194,7 @@ class Environment:
             agent.skills = []
         for goal in self.goals:
             goal.required_skills = []
-        self._initialize_skills()
-
-    def _calculate_path_cost(self, path):
-        return (nx.path_weight(self.grid_map.graph, path, weight="weight"))*(len(path)/self.size)    
+        self._initialize_skills()  
 
     def get_normalized_skill_vectors_for_all_agents(self):
         all_skills_normalized = []
@@ -231,7 +220,6 @@ class Environment:
         else:
             goal = Goal(self.grid_map.random_valid_position())
         self.goals.append(goal)
-        self.num_goals += 1
         if self.num_skills == 1:
             if goal.required_skills == []:
                 goal.required_skills.append(0)
@@ -264,117 +252,13 @@ class Environment:
             self.scheduler.reset()
             return True
         return False
-    
-    def _get_all_agent_to_goal_plans(self):
-        agent_goal_plans: Dict[Tuple[Agent, Goal], List[int]]  = {}
-        agent_goal_costs: Dict[Tuple[Agent, Goal], int]  = {}
-        allowed_goal_agent_pairs: List[Tuple[Goal, Agent]] = []
-        allowed_goal_agent_pairs = self.scheduler.get_allowed_goal_agent_pairs(goals=self.scheduler.unclaimed_goals, agents=self.agents)
-        for agent, goal in allowed_goal_agent_pairs:
-            path = self.planner.generate_shortest_path_for_agent(agent=agent,goal=goal)
-            agent_goal_plans[(agent,goal)] = path
-            agent_goal_costs[(agent,goal)] = self._calculate_path_cost(path)
-        return agent_goal_plans, agent_goal_costs
-    
-
-    def _get_all_goal_to_goal_plans(self):
-        goal_goal_plans: Dict[Tuple[Goal, Goal], List[int]] = {}
-        goal_goal_costs: Dict[Tuple[Goal, Goal], int] = {}
-        goal_goal_combinations = permutations(self.scheduler.unclaimed_goals, 2)
-        for combination in goal_goal_combinations:
-            path = self.grid_map.shortest_path(start=combination[0].position, goal=combination[1].position)
-            goal_goal_plans[combination] = path
-            goal_goal_costs[combination] = self._calculate_path_cost(path)
-        return goal_goal_plans, goal_goal_costs
-    
-    
-    def find_bruteforce_solution(self):
-
-        agent_goal_bench = Benchmark("agent_to_goal", start_now=True)
-        print("Calculating paths from all agents to all goals...")
-        agent_goal_plans, agent_goal_costs = self._get_all_agent_to_goal_plans()
-        agent_goal_bench.stop()
-
-        goal_goal_bench = Benchmark("goal_to_goal", start_now=True)
-        print("Calculating paths between all goals...")
-        goal_goal_plans, goal_goal_costs = self._get_all_goal_to_goal_plans()
-        goal_goal_bench.stop()
-
-        goal_solutions_bench = Benchmark("goal_solutions", start_now=True)
-        print("Figuring out which combinations of agents solve each goal...")
-        goal_solutions = self.scheduler._get_all_goal_solutions(agent_goal_plans=agent_goal_plans)
-        goal_solutions_bench.stop()
-
-
-        possible_solutions_bench = Benchmark("possible_solutions", start_now=True)
-        print("Combining all single-goal solving agent-combinations to find all possible solutions to the full problem...")
-        possible_solutions = self.scheduler._get_all_possible_solutions(goal_solutions=goal_solutions)
-        possible_solutions_bench.stop()
-
-        cheapest_solution_bench = Benchmark("cheapest_solution", start_now=True)
-        print("Finding cheapest solution...")
-        cheapest_solution = self.scheduler._get_cheapest_solution(possible_solutions=possible_solutions, agent_goal_costs=agent_goal_costs, goal_goal_costs=goal_goal_costs)    
-        cheapest_solution_bench.stop()
-
-        print("===================== Found solution =====================")
-
-        return cheapest_solution
-    
-    def find_fast_solution(self):
-        cheapest_combinations = {} # goal: (combination, cost)
-        cheapest_solution = {} # agent: [goal]
-        unaccounted_for_goals = set(self.scheduler.unclaimed_goals)
-        while len(cheapest_solution) != len(self.agents):
-            for goal in unaccounted_for_goals:
-                sorted_combinations = iter(sorted(goal.agent_combinations_which_solve_goal.items(), key=lambda combo_and_cost: combo_and_cost[1]))
-                looking_for_goal_solution = True
-                while looking_for_goal_solution:
-                    try:
-                        (cheapest_goal_combination,cost) = next(sorted_combinations)
-                        looking_for_goal_solution = False
-                    except StopIteration:
-                        break
-                    if any([agent in cheapest_solution for agent in cheapest_goal_combination]):
-                        looking_for_goal_solution = True
-                        continue
-                if not looking_for_goal_solution:
-                    cheapest_combinations[goal] = (cheapest_goal_combination,cost)
-            
-            cheapest_goals_sorted = iter(sorted(cheapest_combinations.items(), key=lambda goal_and_combo_and_cost: goal_and_combo_and_cost[1][1]))
-
-            goal_available = True
-            while True:
-                try:
-                    cheapest_goal, (cheapest_combination, cost) = next(cheapest_goals_sorted)
-                except StopIteration:
-                    goal_available = False
-                    break
-
-                if any([agent in cheapest_solution for agent in cheapest_combination]):
-                    continue
-                else:
-                    break
-            
-            if not goal_available:
-                cheapest_combinations.clear()
-                print("No solution found")
-                print("Cheapest combinations: ", cheapest_combinations)
-                print("Cheapest solution: ", cheapest_solution)
-                break
-
-            for agent in cheapest_combination:
-                cheapest_solution[agent] = [cheapest_goal]
-
-            unaccounted_for_goals.remove(cheapest_goal)
-            cheapest_combinations.clear()
-
-        return cheapest_solution
+        
 
     def find_numerical_solution(self):
         if self.solve_type == "optimal":
-            return self.find_bruteforce_solution()
+            return self.scheduler.find_optimal_solution()
         elif self.solve_type == "fast":
-            return self.find_fast_solution()
+            return self.scheduler.find_fast_solution()
 
     def update(self):
         return self.scheduler.update_goal_statuses()

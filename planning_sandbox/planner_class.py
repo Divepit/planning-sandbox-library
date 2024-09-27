@@ -4,6 +4,8 @@ from planning_sandbox.agent_class import Agent
 from planning_sandbox.goal_class import Goal
 from planning_sandbox.grid_map_class import GridMap
 
+import networkx as nx
+
 class Planner:
     def __init__(self, agents, grid_map):
         self.agents: List[Agent] = agents
@@ -63,11 +65,16 @@ class Planner:
             return self.paths[agent][self.get_next_index_on_path(agent)]
         return agent.position
 
-    def get_move_to_reach_next_position(self, agent: Agent):
+    def get_move_and_cost_to_reach_next_position(self, agent: Agent):
+        current_position = agent.position
         next_position = self.get_next_position_on_path(agent)
-        return self._get_move_to_reach_position(agent, next_position)
+        move_cost = self.grid_map.get_cost_for_move(current_position, next_position)
+        return self._get_move_to_reach_position(agent, next_position), move_cost
     
     
     def assign_shortest_path_for_goal_to_agent(self, agent: Agent, goal: Goal):
         path = self.generate_shortest_path_for_agent(agent, goal)
         self.assign_path_to_agent(agent, path)
+
+    def _calculate_path_cost(self, path):
+        return nx.path_weight(self.grid_map.graph, path, weight="weight")

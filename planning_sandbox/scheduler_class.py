@@ -1,5 +1,5 @@
 from typing import List, Dict
-from itertools import combinations, product
+from itertools import permutations, product
 from planning_sandbox.agent_class import Agent
 from planning_sandbox.goal_class import Goal
 
@@ -95,60 +95,101 @@ class Scheduler:
         for agent in agents:
             skills.extend(agent.skills)
         return set(goal.required_skills).issubset(set(skills))
+
     
-    def _get_all_goal_solutions(self, agent_goal_plans):
-        goal_solutions: Dict[Goal,List[List[Agent]]] = {}
-        for goal in self.unclaimed_goals:
-            goal_solutions[goal] = []
-            for r in range(1,len(self.agents)+1):
-                combos = combinations(self.agents, r)
-                for combination in combos:
-                    invalid_combination = False
-                    for agent in combination:
-                        if (agent,goal) not in agent_goal_plans:
-                            invalid_combination = True
-                            break
-                    if invalid_combination:
-                        invalid_combination = False
-                        continue
-                    if self.agent_combination_has_required_skills_for_goal(agents=combination, goal=goal):
-                        goal_solutions[goal].append(combination)
-        return goal_solutions
+    def find_optimal_solution(self):
+        
+        cheapest_solution = None
+        cheapest_cost = np.inf
+        all_goal_orders = iter(permutations(self.goals, len(self.goals)))
+
+        for goal_order in all_goal_orders:
+            candidate_permutations = product(*[goal.agent_combinations_which_solve_goal.keys() for goal in goal_order])
+            for candidate_permutation in candidate_permutations:
+                proposed_solution = {}
+                for i, agent_list in enumerate(candidate_permutation):
+                    goal = goal_order[i]
+                    for agent in agent_list:
+                        if agent not in proposed_solution:
+                            proposed_solution[agent] = []
+                        proposed_solution[agent].append(goal)
+                proposed_solution_cost = self._calculate_cost_of_solution(proposed_solution, max_cost=cheapest_cost)
+                if cheapest_solution is None or proposed_solution_cost < cheapest_cost:
+                    cheapest_solution = proposed_solution
+                    cheapest_cost = proposed_solution_cost
+        return cheapest_solution
     
-    def _get_all_possible_solutions(self, goal_solutions):
-        solution_lists = list(goal_solutions.values())
-        combinations_of_agents_for_goals = product(*solution_lists)
-        possible_solutions = []
-        for combination_set in combinations_of_agents_for_goals:
-            possible_solution = {}
-            for i,combination in enumerate(combination_set):
-                goal = list(goal_solutions.keys())[i]
-                for agent in combination:
-                    if agent not in possible_solution:
-                        possible_solution[agent] = []
-                    possible_solution[agent].append(goal)
-            possible_solutions.append(possible_solution)
-        return possible_solutions
-    
-    def _calculate_cost_of_solution(self, solution: Dict[Agent, List[Goal]], agent_goal_costs, goal_goal_costs) -> int:
-        solution_cost = []
+    def _calculate_cost_of_solution(self, solution: Dict[Agent, List[Goal]], max_cost) -> int:
+        solution_cost = 0
         for agent, goals in solution.items():
             if goals == []:
                 continue
             first_goal = goals[0]
-            path_cost = agent_goal_costs[(agent,first_goal)]
-            for i in range(2,len(goals)):
-                path_cost += goal_goal_costs[(goals[i-1],goals[i])]
-            solution_cost.append(path_cost)
-        return np.sum(solution_cost)
+            solution_cost += agent.paths_and_costs_to_goals[first_goal][1]
+            if solution_cost > max_cost:
+                return np.inf
+            for i in range(1,len(goals)):
+                previous_goal = goals[i-1]
+                current_goal = goals[i]
+                solution_cost += previous_goal.paths_and_costs_to_other_goals[current_goal][1]
+                if solution_cost > max_cost:
+                    return np.inf
+        return solution_cost
     
 
-    def _get_cheapest_solution(self, possible_solutions, agent_goal_costs, goal_goal_costs):
-        cheapest_solution = None
-        cheapest_cost = np.inf
-        for solution in possible_solutions:
-            cost = self._calculate_cost_of_solution(solution=solution, agent_goal_costs=agent_goal_costs, goal_goal_costs=goal_goal_costs)
-            if cost < cheapest_cost:
-                cheapest_cost = cost
-                cheapest_solution = solution
+    # def _get_cheapest_solution(self, possible_solutions):
+    #     cheapest_solution = None
+    #     cheapest_cost = np.inf
+    #     for solution in possible_solutions:
+    #         cost = self._calculate_cost_of_solution(solution=solution)
+    #         if cost < cheapest_cost:
+    #             cheapest_cost = cost
+    #             cheapest_solution = solution
+    #     return cheapest_solution
+    
+    def find_fast_solution(self):
+        cheapest_combinations = {} # goal: (combination, cost)
+        cheapest_solution: Dict[Agent, List[Goal]] = {} # agent: [goal]
+        unaccounted_for_goals = set(self.unclaimed_goals)
+        while len(cheapest_solution) != len(self.agents):
+            for goal in unaccounted_for_goals:
+                sorted_combinations = iter(sorted(goal.agent_combinations_which_solve_goal.items(), key=lambda combo_and_cost: combo_and_cost[1]))
+                looking_for_goal_solution = True
+                while looking_for_goal_solution:
+                    try:
+                        (cheapest_goal_combination,cost) = next(sorted_combinations)
+                        looking_for_goal_solution = False
+                    except StopIteration:
+                        break
+                    if any([agent in cheapest_solution for agent in cheapest_goal_combination]):
+                        looking_for_goal_solution = True
+                        continue
+                if not looking_for_goal_solution:
+                    cheapest_combinations[goal] = (cheapest_goal_combination,cost)
+            
+            cheapest_goals_sorted = iter(sorted(cheapest_combinations.items(), key=lambda goal_and_combo_and_cost: goal_and_combo_and_cost[1][1]))
+
+            goal_available = True
+            while True:
+                try:
+                    cheapest_goal, (cheapest_combination, cost) = next(cheapest_goals_sorted)
+                except StopIteration:
+                    goal_available = False
+                    break
+
+                if any([agent in cheapest_solution for agent in cheapest_combination]):
+                    continue
+                else:
+                    break
+            
+            if not goal_available:
+                cheapest_combinations.clear()
+                break
+
+            for agent in cheapest_combination:
+                cheapest_solution[agent] = [cheapest_goal]
+
+            unaccounted_for_goals.remove(cheapest_goal)
+            cheapest_combinations.clear()
+
         return cheapest_solution

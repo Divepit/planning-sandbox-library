@@ -1,12 +1,9 @@
-
-from itertools import combinations
-
 class Agent:
     def __init__(self, initial_position):
         self.initial_position = initial_position
         self.position = initial_position
         self.skills = []
-        self.costs_to_reach_goals = {}
+        self.paths_and_costs_to_goals = {}
 
     def reset(self, position=None):
         if position is not None:
@@ -14,7 +11,7 @@ class Agent:
         else:
             self.position = self.initial_position
         self.skills.clear()
-        self.costs_to_reach_goals.clear()
+        self.paths_and_costs_to_goals.clear()
 
     def _move_left(self):
         self.position = (self.position[0] - 1, self.position[1])
@@ -51,8 +48,8 @@ class Agent:
     def add_skill(self, skill):
         self.skills.append(skill)
 
-    def add_cost_to_reach_goal(self, goal, cost):
-        self.costs_to_reach_goals[goal] = cost
+    def add_path_to_goal(self, goal, path, cost):
+        self.paths_and_costs_to_goals[goal] = (path, cost)
 
 
             

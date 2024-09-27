@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import List
+from typing import List, Dict, Tuple
 from itertools import combinations
 
 from planning_sandbox.agent_class import Agent
@@ -11,9 +11,9 @@ class Goal:
         self.required_skills = []
         self.claimed = False
         self.agents_which_have_required_skills: List[Agent] = []
-        self.agent_combinations_which_solve_goal = {}
-        self.cost_to_reach_other_goals = {}
+        self.agent_combinations_which_solve_goal: Dict[Tuple[Agent], np.float32] = {}
         self.cheapest_combination = (None,np.inf)
+        self.paths_and_costs_to_other_goals = {}
 
     def add_skill(self, skill):
         self.required_skills.append(skill)
@@ -26,7 +26,7 @@ class Goal:
         self.required_skills.clear()
         self.agents_which_have_required_skills.clear()
         self.agent_combinations_which_solve_goal.clear()
-        self.cost_to_reach_other_goals.clear()
+        self.paths_and_costs_to_other_goals.clear()
         if position is not None:
             self.position = position
 
@@ -38,18 +38,24 @@ class Goal:
     def add_agent_which_has_required_skills(self, agent):
         self.agents_which_have_required_skills.append(agent)
 
-    def add_cost_to_reach_other_goal(self, goal, cost):
-        self.cost_to_reach_other_goals[goal] = cost
+    def add_path_to_other_goal(self, goal, path, cost):
+        self.paths_and_costs_to_other_goals[goal] = (path, cost)
+
 
     def generate_agent_combinations_which_solve_goal(self):
         for r in range(1, len(self.agents_which_have_required_skills)+1):
             new_combinations = combinations(self.agents_which_have_required_skills, r)
             for combination in new_combinations:
-                if combination not in self.agent_combinations_which_solve_goal and set(self.required_skills).issubset(set([skill for agent in combination for skill in agent.skills])):
+                combination_in_agent_combinations = combination in self.agent_combinations_which_solve_goal
+                required_skills_are_covered = set(self.required_skills).issubset(set([skill for agent in combination for skill in agent.skills]))
+                each_agent_has_skill_to_this_goal = all([self in agent.paths_and_costs_to_goals for agent in combination])
+
+
+                if not combination_in_agent_combinations and required_skills_are_covered and each_agent_has_skill_to_this_goal:
                     combination_cost = 0
                     for agent in combination:
-                        if self in agent.costs_to_reach_goals:
-                            combination_cost += agent.costs_to_reach_goals[self]
+                        if self in agent.paths_and_costs_to_goals:
+                            combination_cost += agent.paths_and_costs_to_goals[self][1]
                     self.agent_combinations_which_solve_goal[combination] = combination_cost
         
 
