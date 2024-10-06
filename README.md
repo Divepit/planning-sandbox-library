@@ -41,9 +41,7 @@ This project implements a multi-agent planning and reinforcement learning enviro
   - `agent_class.py`: Agent implementation
   - `goal_class.py`: Goal implementation
   - `grid_map_class.py`: Grid map and obstacle handling
-  - `controller_class.py`: Action controller
   - `scheduler_class.py`: Task scheduling
-  - `planner_class.py`: Path planning
   - `visualiser_class.py`: Environment visualization
 - `RL/`: Reinforcement Learning implementation
   - `RL_mover_env.py`: RL environment wrapper

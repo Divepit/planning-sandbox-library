@@ -17,9 +17,6 @@ class Goal:
 
     def add_skill(self, skill):
         self.required_skills.append(skill)
-    
-    def claim(self):
-        self.claimed = True 
 
     def reset(self, position=None):
         self.claimed = False

@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import logging
 from typing import Dict
 
 
@@ -18,8 +18,11 @@ from planning_sandbox.benchmark_class import Benchmark
 
 from copy import deepcopy
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
 global opened_3d_map
-opened_3d_map = False
+opened_3d_map = True
 
 def run_sim(env: Environment, speed, cell_size=30, visualize=True):
     global opened_3d_map
@@ -31,7 +34,7 @@ def run_sim(env: Environment, speed, cell_size=30, visualize=True):
 
     max_goals = len(env.goals)
     
-    vis: Visualizer = Visualizer(env, cell_size=cell_size, visualize=visualize, show_3d_elevation=False)
+    vis: Visualizer = Visualizer(env, cell_size=cell_size, visualize=visualize)
     
     if not opened_3d_map:
         vis.display_3d_elevation()
@@ -41,18 +44,20 @@ def run_sim(env: Environment, speed, cell_size=30, visualize=True):
 
     done: bool = False
     current_assignments: Dict[Goal, Agent] = {}
-    steps = 0
-    total_cost = 0
     setup_bench.stop()
     while not done:
-
         bench_step = Benchmark('step',start_now=True, silent=True)
         replan_required = False
 
         if cheapest_solution is None or not cheapest_solution:
-            print("No solution found")
+            logging.debug("No solution found")
             bench_step.stop()
             continue
+
+        for agent in env.agents:
+                if agent not in cheapest_solution:
+                    agent.steps_waited += 1
+
         for agent, goal_list in cheapest_solution.items():
             for i, goal in enumerate(goal_list):
                 if goal.claimed:
@@ -60,12 +65,11 @@ def run_sim(env: Environment, speed, cell_size=30, visualize=True):
                 current_assignments[goal_list[i]] = agent
                 vis.assignments[agent] = goal_list[i]
                 env.scheduler.assign_goal_to_agent(agent=agent, goal=goal_list[i])
-                env.planner.assign_shortest_path_for_goal_to_agent(agent=agent, goal=goal_list[i])
+                env.grid_map.assign_shortest_path_for_goal_to_agent(agent=agent, goal=goal_list[i])
                 break
-            action, action_cost = env.planner.get_move_and_cost_to_reach_next_position(agent)
+            action, action_cost = env.grid_map.get_move_and_cost_to_reach_next_position(agent)
             agent.apply_action(action)
-            total_cost += action_cost
-            steps += 1
+            agent.accumulated_cost += action_cost
 
         replan_required = env.update() > 0 and env.solve_type == 'fast'
 
@@ -87,9 +91,9 @@ def run_sim(env: Environment, speed, cell_size=30, visualize=True):
 
         if replan_required:
             bench_replan = Benchmark('replanning',start_now=True, silent=True)
-            env._connect_agents_and_goals()
+            env.connect_agents_and_goals()
             if new_goal:
-                env._inform_goals_of_costs_to_other_goals()
+                env.inform_goals_of_costs_to_other_goals()
             cheapest_solution = env.find_numerical_solution()
             bench_replan.stop()
         
@@ -101,7 +105,7 @@ def run_sim(env: Environment, speed, cell_size=30, visualize=True):
             bench_step.stop()
             break
         bench_step.stop()
-    return steps, total_cost
+    return
 
 def clone_environments(env, num_clones):
     seed_envs = []
@@ -113,11 +117,11 @@ def clone_environments(env, num_clones):
     return seed_envs
 
 # Some plotting functions written by chatGPT (https://chatgpt.com/share/66f558b4-9844-8008-8442-3e9021b9bbbd)
-def main(iterations = np.inf):
+def main():
     
-    visualize = True
-    iterations = 3
-    num_goals: int = 5
+    visualize = 0
+    iterations = 5
+    num_goals: int = 6
     num_agents: int = 3
     size: int = 100
     num_obstacles: int = 0
@@ -125,10 +129,12 @@ def main(iterations = np.inf):
     cell_size: int = int(1000/size)
     velocity = 200 #m/s (max 200)
     speed = velocity*1/5
-    solve_types = ['fast','optimal']
+    solve_types = ['fast','linalg', 'optimal']
+    # solve_types = ['fast', 'optimal']
+    # solve_types = ['optimal', 'optimal_with_wait_penalty']
     
     
-    print("Setting up environment...")
+    logging.info("Setting up environment...")
     env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
     
     seed_envs = clone_environments(env, iterations)
@@ -139,6 +145,7 @@ def main(iterations = np.inf):
         runtimes = []
         all_steps = []
         all_costs = []
+        all_wait_times = []
         for env in seed_envs:
             if len(runtimes) > 0:
                 time_left = round(np.mean(runtimes) * (iterations - len(runtimes)), 2)
@@ -148,21 +155,24 @@ def main(iterations = np.inf):
             bench = Benchmark('run_sim', start_now=True, silent=True)
             env_copy: Environment = deepcopy(env)
             env_copy.solve_type = solve_type
-            steps, total_cost = run_sim(env=env_copy, speed=speed, cell_size=cell_size, visualize=visualize)
+            run_sim(env=env_copy, speed=speed, cell_size=cell_size, visualize=visualize)
             runtime = bench.stop()
             runtimes.append(runtime)
-            all_steps.append(steps)
+            total_steps, steps_waited, total_cost = env_copy.get_agent_data()
+            all_steps.append(total_steps)
             all_costs.append(total_cost)
+            all_wait_times.append(steps_waited)
 
         results[solve_type] = {
             'runtimes': np.array(runtimes),
             'steps': np.array(all_steps),
             'costs': np.array(all_costs),
+            'wait_times': np.array(all_wait_times)
         }
 
     sns.set_theme(style='whitegrid')
-    metrics = ['runtimes', 'steps', 'costs']
-    metric_names = ['Runtime (s)', 'Steps', 'Total Cost']
+    metrics = ['runtimes', 'steps', 'costs', 'wait_times']
+    metric_names = ['Runtime (s)', 'Steps', 'Total Cost', 'Waited Steps']
     num_metrics = len(metrics)
 
     fig, axes = plt.subplots(1, num_metrics, figsize=(7 * num_metrics, 6))
@@ -209,15 +219,18 @@ def main(iterations = np.inf):
                 fontsize=12
             )
 
-    additional_info = 'Cost Function (at each step) = slope + 0.2 * distance_per_step'
+    additional_info = 'Cost Function (at each step) = slope + 0.1 * distance_per_step'
 
-    if results['optimal']['costs'].mean() < results['fast']['costs'].mean():
-        word = 'cheaper'
-        percentage = (results['fast']['costs'].mean() - results['optimal']['costs'].mean()) / results['fast']['costs'].mean() * 100
+    if 'fast' in results and 'optimal' in results:
+        if results['optimal']['costs'].mean() < results['fast']['costs'].mean():
+            word = 'cheaper'
+            percentage = (results['fast']['costs'].mean() - results['optimal']['costs'].mean()) / results['fast']['costs'].mean() * 100
+        else:
+            word = 'more expensive'
+            percentage = (results['optimal']['costs'].mean() - results['fast']['costs'].mean()) / results['optimal']['costs'].mean() * 100
+        main_result = 'The optimal solver was {:.2f}% {} than the fast solver in terms of total cost.'.format(percentage, word)
     else:
-        word = 'more expensive'
-        percentage = (results['optimal']['costs'].mean() - results['fast']['costs'].mean()) / results['optimal']['costs'].mean() * 100
-    main_result = 'The optimal solver was {:.2f}% {} than the fast solver in terms of total cost.'.format(percentage, word)
+        main_result = ''
 
     fig.suptitle(
         f'\nSimulation Results ({iterations} iterations for each solver)\n'
@@ -230,8 +243,8 @@ def main(iterations = np.inf):
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
 
-    plt.show(block=False)
+    plt.show()
 
 if __name__ == "__main__":
     # cProfile.run('main()', sort='cumtime')
-    main(iterations=10)
+    main()

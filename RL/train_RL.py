@@ -5,6 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import signal
 import torch
+import logging
 from RL_mover_env import RLEnv
 from planning_sandbox.environment_class import Environment
 from stable_baselines3.common.callbacks import BaseCallback
@@ -24,7 +25,7 @@ class EarlyStoppingCallback(BaseCallback):
         signal.signal(signal.SIGINT, self.signal_handler)
 
     def signal_handler(self, sig, frame):
-        print("\nEarly stopping initiated. Completing the current update...")
+        logging.debug("\nEarly stopping initiated. Completing the current update...")
         self.should_stop = True
 
     def _on_step(self) -> bool:
@@ -50,14 +51,14 @@ class TensorboardCallback(BaseCallback):
         if self.num_timesteps - self.last_save >= self.save_freq:
             model_path = f"ppo_custom_env_improved_goal_assignment_intermediate"
             self.model.save(model_path)
-            print(f"Model saved at {model_path}")
+            logging.info(f"Model saved at {model_path}")
             self.last_save = self.num_timesteps
 
         return True
 
 def make_env(rank, num_agents, num_goals, num_obstacles, size, num_skills, seed=0):
     def _init():
-        sandbox_env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
+        sandbox_env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
         env = RLEnv(env=sandbox_env)
         env.reset(seed=seed + rank)
         return env
@@ -66,13 +67,13 @@ def make_env(rank, num_agents, num_goals, num_obstacles, size, num_skills, seed=
 
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
+    logging.info(f"Using device: {device}")
 
     num_envs = 12
-    print(f"Number of environments: {num_envs}")
+    logging.info(f"Number of environments: {num_envs}")
 
-    num_agents = 3
-    num_goals = 5
+    num_agents = 1
+    num_goals = 2
     num_obstacles = 0
     size = 32
     num_skills = 1
@@ -92,7 +93,7 @@ if __name__ == "__main__":
         n_steps=max_steps,
         batch_size=max_steps*num_envs,
         n_epochs=24,
-        learning_rate=linear_schedule(0.0000075),
+        learning_rate=linear_schedule(0.000075),
         clip_range=0.8,
         ent_coef=0.025,
         policy_kwargs = dict(
@@ -112,9 +113,9 @@ if __name__ == "__main__":
             progress_bar=True
         )
     except KeyboardInterrupt:
-        print("\nTraining interrupted. Saving the model...")
+        logging.info("\nTraining interrupted. Saving the model...")
     except Exception as e:
-        print(f"An error occurred during training: {e}")
+        logging.error(f"An error occurred during training: {e}")
     finally:
         model.save("ppo_custom_env_improved_goal_assignment")
-        print("Training completed and model saved.")
+        logging.info("Training completed and model saved.")

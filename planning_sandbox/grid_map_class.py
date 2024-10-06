@@ -1,8 +1,12 @@
 import networkx as nx
 import numpy as np
 import time
+import logging
 from PIL import Image
 from skimage.transform import resize
+
+from planning_sandbox.agent_class import Agent
+from planning_sandbox.goal_class import Goal
 
 TIF = '/Users/marco/Programming/PlanningEnvironmentLibrary/planning_sandbox/maps/shoemaker_ele_5mpp.tif'
 MPP = 5
@@ -16,9 +20,9 @@ class GridMap:
     def __init__(self, size, num_obstacles, use_geo_data=False, flat_map_for_testing=False, downhill_slope_max=np.inf, uphill_slope_max=np.inf, uphill_factor=1):
         
         if flat_map_for_testing:
-            print("========= ATTENTION =========")
-            print("Using flat map for testing")
-            print("========= ATTENTION =========")
+            logging.info("========= ATTENTION =========")
+            logging.info("Using flat map for testing")
+            logging.info("========= ATTENTION =========")
             time.sleep(5)
         
         self.use_geo_data = use_geo_data
@@ -34,11 +38,13 @@ class GridMap:
 
         self.num_obstacles = num_obstacles
         self.obstacles = []
+
+        self.paths = {}
         
         if self.use_geo_data:
             self.data = self._extract_data_from_tif()
             self.downscaled_data, self.pixel_size = self._downscale_data()
-            self.create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=uphill_factor, downhill_slope_max=downhill_slope_max, uphill_slope_max=uphill_slope_max)
+            self._create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=uphill_factor, downhill_slope_max=downhill_slope_max, uphill_slope_max=uphill_slope_max)
         else:
             self._generate_connected_grid_with_obstalces(self.num_obstacles)
 
@@ -55,9 +61,9 @@ class GridMap:
         while True:
             i += 1
             if i % 5 == 0:
-                print(f"Reducing obstacle count by 10%")
+                logging.info(f"Reducing obstacle count by 10%")
                 num_obstacles = int(num_obstacles*0.9)
-                print(f"Current obstacle count: {num_obstacles}")
+                logging.info(f"Current obstacle count: {num_obstacles}")
 
             self.graph = nx.grid_2d_graph(self.size, self.size)
             self.obstacles.clear()
@@ -66,66 +72,20 @@ class GridMap:
                 self.is_connected = True
                 break
     
-    def reset(self):
-        self.obstacles.clear()
-        self.graph = None
-        self.is_connected = False
-        if self.use_geo_data:
-            self.create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=self.uphill_factor, downhill_slope_max=self.downhill_slope_max, uphill_slope_max=self.uphill_slope_max)
-        else:
-            self._generate_connected_grid_with_obstalces(self.num_obstacles)
-
-
-    def add_obstacle(self, pos):
-        self.obstacles.append(pos)
-        self.graph.remove_node(pos)
-    
-    def is_valid_position(self, pos):
-        return (0 <= pos[0] < self.size and 
-                0 <= pos[1] < self.size and 
-                pos not in self.obstacles)
-    
-    def random_valid_position(self):
-        pos = self._random_position()
-        while not self.is_valid_position(pos):
-            pos = self._random_position()
-        return pos
-    
-    def shortest_path(self, start, goal):
-        if self.use_geo_data:
-            path = nx.astar_path(G=self.graph, source=start, target=goal, weight="weight")
-        else:
-            path = nx.astar_path(G=self.graph, source=start, target=goal)
-        return path
-    
-    def get_normalized_positions(self, positions):
-        return [(pos[0] / self.size, pos[1] / self.size) for pos in positions]
-    
-    def random_valid_location_close_to_position(self,position, max_distance):
-        x,y = position
-        x += np.random.randint(-max_distance,max_distance+1)
-        y += np.random.randint(-max_distance,max_distance+1)
-        x = np.clip(x,0,self.size-1)
-        y = np.clip(y,0,self.size-1)
-        if not self.is_valid_position((x,y)):
-            return self.random_valid_location_close_to_position(position,max_distance)
-        return (x,y)
-    
-    
     def _print_tif_info(self,file_path):
-        print("TIFF File Information:")
-        print("-----------------------")
+        logging.info("TIFF File Information:")
+        logging.info("-----------------------")
         
         with Image.open(file_path) as img:
             width, height = img.size
-            print(f"Dimensions: {width} x {height}")
+            logging.info(f"Dimensions: {width} x {height}")
             data = np.array(img)
             min_val = np.min(data)
             max_val = np.max(data)
-            print(f"Min value: {min_val:.2f}")
-            print(f"Max value: {max_val:.2f}")
+            logging.info(f"Min value: {min_val:.2f}")
+            logging.info(f"Max value: {max_val:.2f}")
             
-        print("-----------------------")
+        logging.info("-----------------------")
 
     
     def _extract_data_from_tif(self):
@@ -150,23 +110,40 @@ class GridMap:
         new_pixel_size = MPP * max(current_height, current_width) / max(new_height, new_width)
 
         return downscaled_data, new_pixel_size
-
     
-    def check_if_connected(self):
-        if self.use_geo_data or self.graph is None:
-            return False
-        if nx.is_connected(self.graph):
-            return True
+    def _get_current_index_on_path(self, agent: Agent):
+        return self.paths[agent].index(agent.position)
+    
+    def _get_move_to_reach_position(self, agent: Agent, next_position):
+        current_position = agent.position
+        next_position = next_position
+        if current_position[0] == next_position[0] and current_position[1] == next_position[1] - 1:
+            return 'down'
+        elif current_position[0] == next_position[0] and current_position[1] == next_position[1] + 1:
+            return 'up'
+        elif current_position[0] == next_position[0] - 1 and current_position[1] == next_position[1]:
+            return 'right'
+        elif current_position[0] == next_position[0] + 1 and current_position[1] == next_position[1]:
+            return 'left'
+        elif current_position[0] == next_position[0] and current_position[1] == next_position[1]:
+            return 'stay'
+        else:
+            return 'moveto'
         
-    def get_cost_for_move(self, start, goal):
+    def _is_valid_position(self, pos):
+        return (0 <= pos[0] < self.size and 
+                0 <= pos[1] < self.size and 
+                pos not in self.obstacles)
+    
+    def _get_cost_for_move(self, start, goal):
         if start == goal:
             return 0
         if self.use_geo_data:
             return self.graph.get_edge_data(start, goal)['weight']
         else:
             return MPP
-    
-    def create_directed_graph(self, data, pixel_size, uphill_factor, downhill_slope_max, uphill_slope_max):
+        
+    def _create_directed_graph(self, data, pixel_size, uphill_factor, downhill_slope_max, uphill_slope_max):
         np.set_printoptions(linewidth=100000)
         height, width = data.shape
         G = nx.DiGraph()
@@ -183,7 +160,7 @@ class GridMap:
                         neighbor_elevation = data[ni, nj]
                         elevation_diff = neighbor_elevation - node_elevation
                         slope = elevation_diff / pixel_size
-                        weight = self.calculate_weight(slope)
+                        weight = self._calculate_weight(slope)
                         
                         G.add_edge(node, neighbor_node, weight=weight)
         for i in range(height):
@@ -194,7 +171,7 @@ class GridMap:
 
         self.graph = G
 
-    def calculate_weight(self, slope):
+    def _calculate_weight(self, slope):
         if self.flat_map_for_testing:
             return MPP
         
@@ -211,3 +188,111 @@ class GridMap:
         
         weight += 0.1 * MPP
         return weight
+    
+    def _get_next_index_on_path(self, agent: Agent):
+        if self._get_current_index_on_path(agent) == len(self.paths[agent]) - 1:
+            return self._get_current_index_on_path(agent)
+        return self._get_current_index_on_path(agent) + 1
+    
+    def _get_next_position_on_path(self, agent: Agent):
+        if agent in self.paths:
+            return self.paths[agent][self._get_next_index_on_path(agent)]
+        return agent.position
+        
+    def calculate_path_cost(self, path):
+        if self.use_geo_data:
+            return nx.path_weight(self.graph, path, weight="weight")
+        else:
+            return nx.path_weight(self.graph, path)
+    
+    def reset(self):
+        self.paths.clear()
+        self.obstacles.clear()
+        self.graph = None
+        self.is_connected = False
+        if self.use_geo_data:
+            self._create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=self.uphill_factor, downhill_slope_max=self.downhill_slope_max, uphill_slope_max=self.uphill_slope_max)
+        else:
+            self._generate_connected_grid_with_obstalces(self.num_obstacles)
+
+
+    def add_obstacle(self, pos):
+        self.obstacles.append(pos)
+        self.graph.remove_node(pos)
+    
+    def random_valid_position(self):
+        pos = self._random_position()
+        while not self._is_valid_position(pos):
+            pos = self._random_position()
+        return pos
+    
+    def shortest_path(self, start, goal):
+        if self.use_geo_data:
+            path = nx.astar_path(G=self.graph, source=start, target=goal, weight="weight")
+        else:
+            path = nx.astar_path(G=self.graph, source=start, target=goal)
+        return path
+    
+    def get_normalized_positions(self, positions):
+        return [(pos[0] / self.size, pos[1] / self.size) for pos in positions]
+    
+    def random_valid_location_close_to_position(self,position, max_distance):
+        x,y = position
+        x += np.random.randint(-max_distance,max_distance+1)
+        y += np.random.randint(-max_distance,max_distance+1)
+        x = np.clip(x,0,self.size-1)
+        y = np.clip(y,0,self.size-1)
+        if not self._is_valid_position((x,y)):
+            return self.random_valid_location_close_to_position(position,max_distance)
+        return (x,y)
+    
+    def check_if_connected(self):
+        if self.use_geo_data or self.graph is None:
+            return False
+        if nx.is_connected(self.graph):
+            return True
+        
+    def validate_action(self, agent: Agent, action):
+        position = agent.position
+        if action == 'left' or action == 1:
+            position = (position[0] - 1, position[1])
+        elif action == 'right' or action == 2:
+            position = (position[0] + 1, position[1])
+        elif action == 'up' or action == 3:
+            position = (position[0], position[1] - 1)
+        elif action == 'down' or action == 4:
+            position = (position[0], position[1] + 1)
+        elif action == 'stay' or action == 0:
+            return True
+        is_valid = self._is_valid_position(position)
+        return is_valid
+
+    def generate_shortest_path_for_agent(self, agent: Agent, goal: Goal):
+        if agent in self.paths:
+            current_agent_goal = self.paths[agent][-1]
+        else:
+            current_agent_goal = None
+
+        if current_agent_goal is not None and current_agent_goal == goal.position:
+            path_index = self._get_current_index_on_path(agent)
+            return self.paths[agent][path_index:]
+        
+        start = agent.position
+        goal = goal.position
+        path = self.shortest_path(start, goal)
+
+        return path
+    
+    def assign_path_to_agent(self, agent: Agent, path):
+        self.paths[agent] = path
+    
+    def get_move_and_cost_to_reach_next_position(self, agent: Agent):
+        current_position = agent.position
+        next_position = self._get_next_position_on_path(agent)
+        move_cost = self._get_cost_for_move(current_position, next_position)
+        return self._get_move_to_reach_position(agent, next_position), move_cost
+    
+    def assign_shortest_path_for_goal_to_agent(self, agent: Agent, goal: Goal):
+        path = self.generate_shortest_path_for_agent(agent, goal)
+        self.assign_path_to_agent(agent, path)
+    

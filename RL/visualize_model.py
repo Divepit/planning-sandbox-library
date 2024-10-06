@@ -1,6 +1,6 @@
 import sys
 import os
-import time
+import logging
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from planning_sandbox.environment_class import Environment
@@ -19,21 +19,14 @@ def run_sim():
         model = PPO.load("ppo_custom_env_improved_goal_assignment_intermediate")
         # model = PPO.load("ppo_custom_env_optimized_gpu")
         # model = PPO.load("/Users/marco/Programming/PlanningEnvironmentLibrary/RL/saved_models/easy_test_2g")
-        print("Loaded trained model")
+        logging.info("Loaded trained model")
     except:
         run_sim()
-        print("Trained model not found. Please make sure the model file exists.")
+        logging.error("Trained model not found. Please make sure the model file exists.")
     
-
-    num_agents = 3
-    num_goals = 5
-    num_obstacles = 0
-    size = 32
-    num_skills = 1
-    max_steps = size*3
+    max_steps = 50
 
 
-    sandboxEnv = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills)
     RLenv = RLEnv(sandboxEnv)
 
     visualizer = Visualizer(sandboxEnv, cell_size=30)
@@ -51,6 +44,9 @@ def run_sim():
     step = 0
 
     while not done:
+        
+        if step >= max_steps:
+            break
 
         model_action, _ = model.predict(obs, deterministic=False)
         
@@ -66,6 +62,15 @@ def run_sim():
         visualizer.run_step()
 
 
+num_agents = 1
+num_goals = 2
+num_obstacles = 0
+size = 32
+num_skills = 1
+sandboxEnv = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
+
+
 while(True):
     run_sim()
+    sandboxEnv.reset()
 

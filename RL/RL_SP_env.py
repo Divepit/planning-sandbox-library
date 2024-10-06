@@ -1,6 +1,7 @@
 import gymnasium as gym
 import numpy as np
 import copy
+import logging
 
 from planning_sandbox.environment_class import Environment
 
@@ -24,7 +25,7 @@ class RLEnv(gym.Env):
         self._update_obs_values()
 
         
-        print(f"Observation size: {self.obs_size}")
+        logging.debug(f"Observation size: {self.obs_size}")
 
     def step(self, action):
         actions = np.array(action)
@@ -36,10 +37,10 @@ class RLEnv(gym.Env):
 
         for i, agent in enumerate(self.sandboxEnv.agents):
             goal = self.sandboxEnv.goals[actions[i]]
-            path = self.sandboxEnv.planner.generate_shortest_path_for_agent(agent, goal)
-            self.sandboxEnv.planner.assign_path_to_agent(agent, path)
-            agent_action, action_cost = self.sandboxEnv.planner.get_move_and_cost_to_reach_next_position(agent)
-            action_is_valid = self.sandboxEnv.controller.validate_action(agent, agent_action)
+            path = self.sandboxEnv.grid_map.generate_shortest_path_for_agent(agent, goal)
+            self.sandboxEnv.grid_map.assign_path_to_agent(agent, path)
+            agent_action, action_cost = self.sandboxEnv.grid_map.get_move_and_cost_to_reach_next_position(agent)
+            action_is_valid = self.sandboxEnv.grid_map.validate_action(agent, agent_action)
             if action_is_valid:
                 if agent_action == 0 or agent_action == 'stay':
                     self.episode_stay_actions += 1

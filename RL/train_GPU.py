@@ -175,7 +175,7 @@ class MixedPrecisionPPO(PPO):
 
             if self.target_kl is not None and np.mean(approx_kl_divs) > 1.5 * self.target_kl:
                 continue_training = False
-                print(f"Early stopping at step {epoch} due to reaching max kl: {np.mean(approx_kl_divs):.2f}")
+                logging.debug(f"Early stopping at step {epoch} due to reaching max kl: {np.mean(approx_kl_divs):.2f}")
                 break
 
         self._n_updates += self.n_epochs

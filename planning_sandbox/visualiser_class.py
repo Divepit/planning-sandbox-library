@@ -187,8 +187,8 @@ class Visualizer:
         if self.visualize == False:
             return
         for agent in self.agents:
-            if agent in self.sandboxEnv.planner.paths:
-                path = self.sandboxEnv.planner.paths[agent]
+            if agent in self.sandboxEnv.grid_map.paths:
+                path = self.sandboxEnv.grid_map.paths[agent]
                 for i in range(len(path) - 1):
                     start = (path[i][0] * self.cell_size + self.cell_size // 2,
                              path[i][1] * self.cell_size + self.cell_size // 2)
