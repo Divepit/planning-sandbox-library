@@ -56,9 +56,9 @@ class TensorboardCallback(BaseCallback):
 
         return True
 
-def make_env(rank, num_agents, num_goals, num_obstacles, size, num_skills, seed=0):
+def make_env(rank, num_agents, num_goals, size, num_skills, seed=0):
     def _init():
-        sandbox_env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
+        sandbox_env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_skills=num_skills, use_geo_data=True)
         env = RLEnv(env=sandbox_env)
         env.reset(seed=seed + rank)
         return env
@@ -74,13 +74,12 @@ if __name__ == "__main__":
 
     num_agents = 1
     num_goals = 2
-    num_obstacles = 0
     size = 32
     num_skills = 1
     max_steps = size*3
 
 
-    env = SubprocVecEnv([make_env(rank=i, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, size=size, num_skills=num_skills) for i in range(num_envs)])
+    env = SubprocVecEnv([make_env(rank=i, num_agents=num_agents, num_goals=num_goals, size=size, num_skills=num_skills) for i in range(num_envs)])
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=10.)
 
     log_dir = "./logs"

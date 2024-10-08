@@ -23,18 +23,20 @@ class Agent:
     def _stay(self):
         pass
 
-    def reset(self, position=None):
+    def reset(self, position=None, randomize_skills=False):
         if position is not None:
             self.position = position
+            self.initial_position = position
         else:
             self.position = self.initial_position
-        self.skills.clear()
+        if randomize_skills:
+            self.skills.clear()
         self.paths_and_costs_to_goals.clear()
         self.steps_moved = 0
         self.steps_waited = 0
         self.accumulated_cost = 0
 
-    def apply_action(self, action):
+    def apply_action(self, action, action_cost):
         if action == 1 or action == 'left':
             self._move_left()
         elif action == 2 or action == 'right':
@@ -52,6 +54,8 @@ class Agent:
             self.steps_waited += 1
         else:
             self.steps_moved += 1
+        
+        self.accumulated_cost += action_cost
     
     def add_skill(self, skill):
         self.skills.append(skill)

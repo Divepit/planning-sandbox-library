@@ -1,67 +1,51 @@
-from typing import Dict, List
 import pygame
 import numpy as np
 
 from planning_sandbox.environment_class import Environment
-from planning_sandbox.agent_class import Agent
-from planning_sandbox.goal_class import Goal
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # Required for 3D plotting
 import matplotlib.cm as cm
-import matplotlib.colors as colors
 
-# Colors
 BACKGROUND = (240, 240, 240)
 GRID_LINE = (100, 100, 100)
-OBSTACLE = (100, 100, 100)
 AGENT = (41, 128, 185)
 GOAL_UNCLAIMED = (231, 76, 60)
 GOAL_CLAIMED = (46, 204, 113)
 ASSIGNMENT = (241, 196, 15)
-PATH = (52, 152, 219)  # New color for the path
+PATH = (52, 152, 219)
 TEXT = (50, 50, 50)
-
-# Cell size
 CELL_SIZE = 5
 
 class Visualizer:
-    def __init__(self, sandboxEnv, cell_size=CELL_SIZE, visualize=True, show_3d_elevation=False):
-        pygame.init()
-        self.visualize = visualize
-        self.show_3d_elevation = show_3d_elevation
-        self.assignments: Dict[Agent, Goal] = {}
-        self.sandboxEnv: Environment = sandboxEnv
-        if self.visualize:
-            self.cell_size = cell_size
-            self.size = self.sandboxEnv.size * self.cell_size
-            self.screen = pygame.display.set_mode((self.size, self.size))
-            pygame.display.set_caption("Modern Grid World")
-            self.font = pygame.font.Font(pygame.font.get_default_font(), 16)
-            self.debug_font = pygame.font.Font(pygame.font.get_default_font(), 12)
+    def __init__(self, env: Environment, speed=20):
+        self.env = env
+        self.speed = speed
+        self.setup_pygame()
 
-        if self.sandboxEnv.grid_map.use_geo_data:
+    def setup_pygame(self):
+        pygame.init()
+        self.cell_size: int = int(1000/self.env.size)
+        self.size = self.env.size * self.cell_size
+        self.screen = pygame.display.set_mode((self.size, self.size))
+        pygame.display.set_caption("Modern Grid World")
+        self.font = pygame.font.Font(pygame.font.get_default_font(), 16)
+        self.debug_font = pygame.font.Font(pygame.font.get_default_font(), 12)
+
+        if self.env.grid_map.use_geo_data:
             self.elevation_surface = None
             self.update_elevation_surface()
 
     @property
     def agents(self):
-        return self.sandboxEnv.agents
+        return self.env.agents
 
     @property
     def goals(self):
-        return self.sandboxEnv.goals
-
-    @property
-    def obstacles(self):
-        return self.sandboxEnv.obstacles
+        return self.env.goals
 
     # Function for coloration and 3D map created by ChatGPT (https://chatgpt.com/share/66f66db2-2750-8008-a104-700c5c92cfa9)
     def update_elevation_surface(self):
-        if not self.visualize:
-            return
-
-        elevations = self.sandboxEnv.grid_map.downscaled_data
+        elevations = self.env.grid_map.downscaled_data
 
         # Normalize elevations between 0 and 1 for colormap
         min_elevation = np.min(elevations)
@@ -74,8 +58,8 @@ class Visualizer:
         # Create a surface with the same size as the grid
         self.elevation_surface = pygame.Surface((self.size, self.size))
 
-        for y in range(self.sandboxEnv.size):
-            for x in range(self.sandboxEnv.size):
+        for y in range(self.env.size):
+            for x in range(self.env.size):
                 elevation = normalized_elevations[y, x]
                 # Get the RGBA color from the colormap
                 rgba_color = colormap(elevation)
@@ -92,13 +76,8 @@ class Visualizer:
                     ),
                 )
 
-        if self.show_3d_elevation:
-            self.display_3d_elevation()
-
-
-
     def display_3d_elevation(self):
-        elevations = self.sandboxEnv.grid_map.downscaled_data
+        elevations = self.env.grid_map.downscaled_data
         size = elevations.shape[0]
         
         # Create coordinate grids
@@ -129,25 +108,15 @@ class Visualizer:
         plt.show(block=False)
 
     def draw_grid(self):
-        if self.visualize == False:
-            return
         self.screen.fill(BACKGROUND)
-        if self.sandboxEnv.grid_map.use_geo_data:
+        if self.env.grid_map.use_geo_data:
             self.screen.blit(self.elevation_surface, (0, 0))
         for x in range(0, self.size, self.cell_size):
             pygame.draw.line(self.screen, GRID_LINE, (x, 0), (x, self.size))
         for y in range(0, self.size, self.cell_size):
             pygame.draw.line(self.screen, GRID_LINE, (0, y), (self.size, y))
 
-    def draw_obstacles(self):
-        if self.visualize == False:
-            return
-        for obstacle in self.obstacles:
-            pygame.draw.rect(self.screen, OBSTACLE, (obstacle[0] * self.cell_size, obstacle[1] * self.cell_size, self.cell_size, self.cell_size))
-
     def draw_agents(self):
-        if self.visualize == False:
-            return
         for i, agent in enumerate(self.agents):
             x, y = agent.position
             center = (x * self.cell_size + self.cell_size // 2, y * self.cell_size + self.cell_size // 2)
@@ -160,8 +129,6 @@ class Visualizer:
             self.screen.blit(skills_text, (x * self.cell_size, y * self.cell_size + self.cell_size))
 
     def draw_goals(self):
-        if self.visualize == False:
-            return
         for i, goal in enumerate(self.goals):
             x, y = goal.position
             color = GOAL_CLAIMED if goal.claimed else GOAL_UNCLAIMED
@@ -174,9 +141,7 @@ class Visualizer:
             self.screen.blit(skills_text, (x * self.cell_size, y * self.cell_size + self.cell_size))
 
     def draw_assignments(self):
-        if self.visualize == False:
-            return
-        for agent, goal in self.assignments.items():
+        for agent, goal in self.env.scheduler.goal_assignments.items():
             start = (agent.position[0] * self.cell_size + self.cell_size // 2,
                      agent.position[1] * self.cell_size + self.cell_size // 2)
             end = (goal.position[0] * self.cell_size + self.cell_size // 2,
@@ -184,11 +149,9 @@ class Visualizer:
             pygame.draw.line(self.screen, ASSIGNMENT, start, end, 2)
 
     def draw_paths(self):
-        if self.visualize == False:
-            return
         for agent in self.agents:
-            if agent in self.sandboxEnv.grid_map.paths:
-                path = self.sandboxEnv.grid_map.paths[agent]
+            if agent in self.env.grid_map.paths:
+                path = self.env.grid_map.paths[agent]
                 for i in range(len(path) - 1):
                     start = (path[i][0] * self.cell_size + self.cell_size // 2,
                              path[i][1] * self.cell_size + self.cell_size // 2)
@@ -196,34 +159,31 @@ class Visualizer:
                            path[i+1][1] * self.cell_size + self.cell_size // 2)
                     pygame.draw.line(self.screen, PATH, start, end, 2)
 
-    def set_assignments(self, assignments):
-        if self.visualize == False:
-            return
-        self.assignments = assignments
-
-    def run_step(self, iterations=1, speed=20):
-        if self.visualize == False:
-            return
-        done = False
+    def run_step(self):
         clock = pygame.time.Clock()
-        i = 0
-        while not done:
-            if i >= iterations:
-                break
-            self.draw_grid()
-            self.draw_obstacles()
-            self.draw_paths()  # Draw paths before goals and agents
-            self.draw_goals()
-            self.draw_agents()
-            self.draw_assignments()
-            pygame.display.flip()
-            clock.tick(speed)
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    done = True
-            i += 1
+        self.draw_grid()
+        self.draw_paths()  # Draw paths before goals and agents
+        self.draw_goals()
+        self.draw_agents()
+        self.draw_assignments()
+        pygame.display.flip()
+        clock.tick(self.speed)
 
     def close(self):
-        if self.visualize == False:
-            return
         pygame.quit()
+
+    def visualise_cheapest_solution(self, max_iterations = None):
+        self.env.reset(randomize_skills=False, randomize_goal_positions=False, randomize_agent_positions=False)
+        self.setup_pygame()
+        
+        if max_iterations is None:
+            max_iterations = self.size**2
+        
+        for _ in range(max_iterations):
+            self.env.step_environment()
+            self.run_step()
+            if self.env.scheduler.all_goals_claimed():
+                break
+
+        self.close()
+    

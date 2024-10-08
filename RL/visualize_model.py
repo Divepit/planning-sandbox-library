@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from planning_sandbox.environment_class import Environment
 from RL_mover_env import RLEnv
 from stable_baselines3 import PPO
-from planning_sandbox.visualiser_class import Visualizer
+from planning_sandbox.visualizer_class import Visualizer
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 # Load the trained model
@@ -29,7 +29,7 @@ def run_sim():
 
     RLenv = RLEnv(sandboxEnv)
 
-    visualizer = Visualizer(sandboxEnv, cell_size=30)
+    visualizer = Visualizer(sandboxEnv)
     RLenv = DummyVecEnv([lambda: RLenv])
 
 
@@ -64,10 +64,9 @@ def run_sim():
 
 num_agents = 1
 num_goals = 2
-num_obstacles = 0
 size = 32
 num_skills = 1
-sandboxEnv = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_obstacles=num_obstacles, num_skills=num_skills, use_geo_data=True)
+sandboxEnv = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_skills=num_skills, use_geo_data=True)
 
 
 while(True):

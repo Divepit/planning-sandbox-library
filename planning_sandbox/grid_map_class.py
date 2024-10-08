@@ -17,7 +17,7 @@ ORIGINAL_TOP_LEFT = (X_OFFSET, Y_OFFSET)
 ORIGINAL_BOTTOM_RIGHT = (X_OFFSET + WINDOW_SIZE, Y_OFFSET + WINDOW_SIZE)
 
 class GridMap:
-    def __init__(self, size, num_obstacles, use_geo_data=False, flat_map_for_testing=False, downhill_slope_max=np.inf, uphill_slope_max=np.inf, uphill_factor=1):
+    def __init__(self, size, use_geo_data=False, flat_map_for_testing=False, downhill_slope_max=np.inf, uphill_slope_max=np.inf, uphill_factor=1):
         
         if flat_map_for_testing:
             logging.info("========= ATTENTION =========")
@@ -36,8 +36,6 @@ class GridMap:
         self.graph = None
         self.is_connected = False
 
-        self.num_obstacles = num_obstacles
-        self.obstacles = []
 
         self.paths = {}
         
@@ -46,31 +44,15 @@ class GridMap:
             self.downscaled_data, self.pixel_size = self._downscale_data()
             self._create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=uphill_factor, downhill_slope_max=downhill_slope_max, uphill_slope_max=uphill_slope_max)
         else:
-            self._generate_connected_grid_with_obstalces(self.num_obstacles)
+            self._generate_connected_grid()
 
     def _random_position(self):
         return (np.random.randint(0, self.size), np.random.randint(0, self.size))
-    
-    def _generate_random_obstacles(self, num_obstacles):
-        for _ in range(num_obstacles):
-            pos = self.random_valid_position()
-            self.add_obstacle(pos)
 
-    def _generate_connected_grid_with_obstalces(self, num_obstacles):
-        i = 0
-        while True:
-            i += 1
-            if i % 5 == 0:
-                logging.info(f"Reducing obstacle count by 10%")
-                num_obstacles = int(num_obstacles*0.9)
-                logging.info(f"Current obstacle count: {num_obstacles}")
-
-            self.graph = nx.grid_2d_graph(self.size, self.size)
-            self.obstacles.clear()
-            self._generate_random_obstacles(num_obstacles)
-            if nx.is_connected(self.graph):
-                self.is_connected = True
-                break
+    def _generate_connected_grid(self):
+        self.graph = nx.grid_2d_graph(self.size, self.size)
+        if nx.is_connected(self.graph):
+            self.is_connected = True
     
     def _print_tif_info(self,file_path):
         logging.info("TIFF File Information:")
@@ -132,8 +114,7 @@ class GridMap:
         
     def _is_valid_position(self, pos):
         return (0 <= pos[0] < self.size and 
-                0 <= pos[1] < self.size and 
-                pos not in self.obstacles)
+                0 <= pos[1] < self.size)
     
     def _get_cost_for_move(self, start, goal):
         if start == goal:
@@ -207,18 +188,12 @@ class GridMap:
     
     def reset(self):
         self.paths.clear()
-        self.obstacles.clear()
         self.graph = None
         self.is_connected = False
         if self.use_geo_data:
             self._create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=self.uphill_factor, downhill_slope_max=self.downhill_slope_max, uphill_slope_max=self.uphill_slope_max)
         else:
-            self._generate_connected_grid_with_obstalces(self.num_obstacles)
-
-
-    def add_obstacle(self, pos):
-        self.obstacles.append(pos)
-        self.graph.remove_node(pos)
+            self._generate_connected_grid()
     
     def random_valid_position(self):
         pos = self._random_position()

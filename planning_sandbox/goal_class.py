@@ -8,6 +8,7 @@ from planning_sandbox.agent_class import Agent
 class Goal:
     def __init__(self, position):
         self.position = position
+        self.initial_position = position
         self.required_skills = []
         self.claimed = False
         self.agents_which_have_required_skills: List[Agent] = []
@@ -18,14 +19,17 @@ class Goal:
     def add_skill(self, skill):
         self.required_skills.append(skill)
 
-    def reset(self, position=None):
+    def reset(self, position=None, randomize_skills=False):
         self.claimed = False
-        self.required_skills.clear()
+        if randomize_skills:
+            self.required_skills.clear()
         self.agents_which_have_required_skills.clear()
         self.agent_combinations_which_solve_goal.clear()
         self.paths_and_costs_to_other_goals.clear()
+        self.cheapest_combination = (None,np.inf)
         if position is not None:
             self.position = position
+            self.initial_position = position
 
     def soft_reset(self):
         self.agents_which_have_required_skills.clear()

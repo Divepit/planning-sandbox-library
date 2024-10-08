@@ -9,9 +9,8 @@ class Scheduler:
     def __init__(self, agents, goals):
         self.agents: List[Agent] = agents
         self.goals: List[Goal] = goals
-        self.unclaimed_goals: List[Goal] = goals
-        
-        self.goal_assignments = {}
+        self.unclaimed_goals: List[Goal] = [goal for goal in goals if not goal.claimed]
+        self.goal_assignments: Dict[Agent, Goal] = {}
 
     def _get_agents_present_at_goal(self, goal: Goal):
         return [agent for agent in self.agents if agent.position == goal.position]
@@ -32,16 +31,6 @@ class Scheduler:
         skills_required = goal.required_skills
         if set(skills_required).issubset(set(skills_of_agents_present)):
             return True
-    
-    def _update_goal_status(self, goal: Goal):
-        amount_of_claimed_goals = 0
-        if goal.claimed:
-            return 0
-        if self._goal_can_be_claimed(goal):
-            goal.claimed = True
-            amount_of_claimed_goals += 1
-        self.unclaimed_goals = [goal for goal in self.goals if not goal.claimed]
-        return amount_of_claimed_goals
 
     def _calculate_cost_of_solution(self, solution: Dict[Agent, List[Goal]], max_cost) -> int:
         solution_cost = 0
@@ -65,12 +54,7 @@ class Scheduler:
     
     def reset(self):
         self.goal_assignments = {}
-        self.unclaimed_goals = self.goals
-
-    def assign_goal_to_agent(self, agent: Agent, goal: Goal):
-        if agent in self.goal_assignments:
-            self.goal_assignments[agent] = goal
-
+        self.unclaimed_goals = [goal for goal in self.goals if not goal.claimed]
 
     def get_normalized_claimed_goals(self):
         return [int(goal.claimed) for goal in self.goals]
@@ -87,10 +71,15 @@ class Scheduler:
         return len(self.unclaimed_goals) == 0
     
     def update_goal_statuses(self):
-        amount_of_claimed_goals = 0
+        claimed_a_goal = False
         for goal in self.goals:
-            amount_of_claimed_goals += self._update_goal_status(goal)
-        return amount_of_claimed_goals
+            if goal.claimed:
+                continue
+            if self._goal_can_be_claimed(goal):
+                goal.claimed = True
+                claimed_a_goal = True
+        self.unclaimed_goals = [goal for goal in self.goals if not goal.claimed]
+        return claimed_a_goal
     
     def is_goal_position(self, position):
         return any([goal.position == position for goal in self.goals])
@@ -163,12 +152,13 @@ class Scheduler:
         
         cheapest_solution = None
         cheapest_cost = np.inf
-        all_goal_orders = iter(permutations(self.goals, len(self.goals)))
+        all_goal_orders = iter(permutations(self.unclaimed_goals, len(self.unclaimed_goals)))
 
         for goal_order in all_goal_orders:
             candidate_permutations =iter(product(*[goal.agent_combinations_which_solve_goal.keys() for goal in goal_order]))
             for candidate_permutation in candidate_permutations:
                 proposed_solution = {}
+                proposed_solution_cost = np.inf
                 for i, agent_list in enumerate(candidate_permutation):
                     goal = goal_order[i]
                     for agent in agent_list:
