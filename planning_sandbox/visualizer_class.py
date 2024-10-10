@@ -172,15 +172,15 @@ class Visualizer:
     def close(self):
         pygame.quit()
 
-    def visualise_cheapest_solution(self, max_iterations = None):
-        self.env.reset(randomize_skills=False, randomize_goal_positions=False, randomize_agent_positions=False)
+    def visualise_full_solution(self, max_iterations = None):
+        self.env.soft_reset()
         self.setup_pygame()
         
         if max_iterations is None:
             max_iterations = self.size**2
         
         for _ in range(max_iterations):
-            self.env.step_environment()
+            self.env.step_environment(fast=False)
             self.run_step()
             if self.env.scheduler.all_goals_claimed():
                 break

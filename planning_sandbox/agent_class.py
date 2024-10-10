@@ -23,15 +23,23 @@ class Agent:
     def _stay(self):
         pass
 
-    def reset(self, position=None, randomize_skills=False):
+    def move_to_position(self, position):
+        self.position = position
+
+    def reset(self, position=None):
         if position is not None:
             self.position = position
             self.initial_position = position
         else:
             self.position = self.initial_position
-        if randomize_skills:
-            self.skills.clear()
+        self.skills.clear()
         self.paths_and_costs_to_goals.clear()
+        self.steps_moved = 0
+        self.steps_waited = 0
+        self.accumulated_cost = 0
+
+    def soft_reset(self):
+        self.position = self.initial_position
         self.steps_moved = 0
         self.steps_waited = 0
         self.accumulated_cost = 0

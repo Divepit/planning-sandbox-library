@@ -20,9 +20,9 @@ class GridMap:
     def __init__(self, size, use_geo_data=False, flat_map_for_testing=False, downhill_slope_max=np.inf, uphill_slope_max=np.inf, uphill_factor=1):
         
         if flat_map_for_testing:
-            logging.info("========= ATTENTION =========")
-            logging.info("Using flat map for testing")
-            logging.info("========= ATTENTION =========")
+            logging.warning("========= ATTENTION =========")
+            logging.warning("Using flat map for testing")
+            logging.warning("========= ATTENTION =========")
             time.sleep(5)
         
         self.use_geo_data = use_geo_data
@@ -55,19 +55,19 @@ class GridMap:
             self.is_connected = True
     
     def _print_tif_info(self,file_path):
-        logging.info("TIFF File Information:")
-        logging.info("-----------------------")
+        logging.debug("TIFF File Information:")
+        logging.debug("-----------------------")
         
         with Image.open(file_path) as img:
             width, height = img.size
-            logging.info(f"Dimensions: {width} x {height}")
+            logging.debug(f"Dimensions: {width} x {height}")
             data = np.array(img)
             min_val = np.min(data)
             max_val = np.max(data)
-            logging.info(f"Min value: {min_val:.2f}")
-            logging.info(f"Max value: {max_val:.2f}")
+            logging.debug(f"Min value: {min_val:.2f}")
+            logging.debug(f"Max value: {max_val:.2f}")
             
-        logging.info("-----------------------")
+        logging.debug("-----------------------")
 
     
     def _extract_data_from_tif(self):
@@ -188,12 +188,6 @@ class GridMap:
     
     def reset(self):
         self.paths.clear()
-        self.graph = None
-        self.is_connected = False
-        if self.use_geo_data:
-            self._create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=self.uphill_factor, downhill_slope_max=self.downhill_slope_max, uphill_slope_max=self.uphill_slope_max)
-        else:
-            self._generate_connected_grid()
     
     def random_valid_position(self):
         pos = self._random_position()
@@ -268,6 +262,6 @@ class GridMap:
         return self._get_move_to_reach_position(agent, next_position), move_cost
     
     def assign_shortest_path_for_goal_to_agent(self, agent: Agent, goal: Goal):
-        path = self.generate_shortest_path_for_agent(agent, goal)
+        path = self.generate_shortest_path_for_agent(agent, goal) 
         self.assign_path_to_agent(agent, path)
     

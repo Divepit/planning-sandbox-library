@@ -12,29 +12,29 @@ from planning_sandbox.benchmark_class import Benchmark
 import numpy as np
 
 class Environment:
-    def __init__(self, size, num_agents, num_goals, num_skills, use_geo_data=False, solve_type="fast"):
+    def __init__(self, size, num_agents, num_goals, num_skills, use_geo_data=False, solve_type="optimal",replan_on_goal_claim=False):
         self.size = size
         self.map_diagonal = np.sqrt(2 * (size ** 2))
         self.solve_type = solve_type
         self.num_skills = num_skills
-        self.replan_on_goal_claim = True
+        self.replan_on_goal_claim = replan_on_goal_claim
+        self.deadlocked = False
 
         self.goals: List[Goal] = []
         self.agents: List[Agent] = []
         self.scheduler = Scheduler(agents=self.agents, goals=self.goals)
-        self.cheapest_solution = None
+        self.full_solution = {}
+        
 
         self._initial_num_agents = num_agents
         self._initial_num_goals = num_goals
-        self._initial_num_skills = num_skills
         
         self.grid_map = GridMap(self.size, use_geo_data=use_geo_data)
         self._starting_position = self.grid_map.random_valid_position()
 
+        self._init()
         
         self._log_environment_info()
-        
-        self._init()
 
     def _init(self):
         self._initialize_goals()
@@ -48,12 +48,12 @@ class Environment:
         self.inform_goals_of_costs_to_other_goals()
 
     def _log_environment_info(self):
-        logging.info(f"=== Environment settings ===")
-        logging.info(f"Num agents: {len(self.agents)}")
-        logging.info(f"Num goals: {len(self.goals)}")
-        logging.info(f"Num skills: {self.num_skills}")
-        logging.info(f"Map size: {self.size}")
-        logging.info(f"=== === === === === === ===")
+        logging.debug(f"=== Environment settings ===")
+        logging.debug(f"Num agents: {len(self.agents)}")
+        logging.debug(f"Num goals: {len(self.goals)}")
+        logging.debug(f"Num skills: {self.num_skills}")
+        logging.debug(f"Map size: {self.size}")
+        logging.debug(f"=== === === === === === ===")
         
     def _initialize_agents(self):
         if self._starting_position is not None:
@@ -126,7 +126,9 @@ class Environment:
     def connect_agents_and_goals(self):
         inform_goals_of_agents_bench = Benchmark("inform_goals_of_agents", start_now=True, silent=True)
         for goal in self.scheduler.unclaimed_goals:
-            goal.soft_reset()
+            # goal.agents_which_have_required_skills.clear()
+            # goal.agent_combinations_which_solve_goal.clear()
+            # goal.cheapest_combination = (None,np.inf)
             for agent in self.agents:
                 if any(skill in agent.skills for skill in goal.required_skills):
                     goal.add_agent_which_has_required_skills(agent)
@@ -163,29 +165,32 @@ class Environment:
 
         inform_goals_of_costs_bench.stop()        
 
-    def reset(self, randomize_goal_positions=True, randomize_agent_positions=True, randomize_skills=True):
-        self.num_skills = self._initial_num_skills
-
-
+    def soft_reset(self):
+        self.deadlocked = False
         self.grid_map.reset()
-        self._starting_position = self.grid_map.random_valid_position()
-        
-        
         for goal in self.goals:
-            new_position = None
-            if randomize_goal_positions:
-                new_position = self.grid_map.random_valid_position()
-            goal.reset(position=new_position, randomize_skills=randomize_skills)
+            goal.soft_reset()
 
         for agent in self.agents:
-            new_position = None
-            if randomize_agent_positions:
-                new_position = self.grid_map.random_valid_position()
-            agent.reset(position=new_position, randomize_skills=randomize_skills)
-        if randomize_skills:
-            while not self._all_skills_represented():
-                self._reset_skills()
-                self._initialize_skills()
+            agent.soft_reset()
+
+        self.scheduler.reset()
+
+    def reset(self):
+        self.deadlocked = False
+        self.grid_map.reset()
+        for goal in self.goals:
+            new_position = self.grid_map.random_valid_position()
+            goal.reset(new_position)
+
+        self._starting_position = self.grid_map.random_valid_position()
+
+        for agent in self.agents:
+            agent.reset(self._starting_position)
+
+        while not self._all_skills_represented():
+            self._reset_skills()
+            self._initialize_skills()
 
 
         self.scheduler.reset()
@@ -209,113 +214,141 @@ class Environment:
             for skill in goal.required_skills:
                 goal_skills_normalized[skill] = 1
             all_skills_normalized.extend(goal_skills_normalized)
-        return all_skills_normalized
-
-    def add_random_goal(self, location=None):
-        if location is not None:
-            goal = self._add_goal(location)
-        else:
-            goal = self._add_goal(self.grid_map.random_valid_position())
-        if self.num_skills == 1:
-            if goal.required_skills == []:
-                goal.required_skills.append(0)
-            return
-        amount_of_skills = np.random.randint(1, min(3,self.num_skills+1))
-        skills = []
-        for _ in range(amount_of_skills):
-            skill = np.random.randint(0, self.num_skills)
-            while skill in skills:
-                skill = np.random.randint(0, self.num_skills)
-            skills.append(skill)
-        goal.required_skills = skills
-        self.scheduler.reset()
-        
+        return all_skills_normalized        
 
     def find_numerical_solution(self):
         if self.solve_type == "optimal":
             self.replan_on_goal_claim = False
-            self.cheapest_solution = self.scheduler.find_optimal_solution()
+            self.full_solution = self.scheduler.find_optimal_solution()
         elif self.solve_type == "fast":
             self.replan_on_goal_claim = True
-            self.cheapest_solution = self.scheduler.find_fast_solution()
+            if self.full_solution is None:
+                self.full_solution = {}
+            intermediate_solution = self.scheduler.find_fast_solution()
+            for agent in intermediate_solution:
+                if agent not in self.full_solution:
+                    self.full_solution[agent] = []
+                self.full_solution[agent].extend(intermediate_solution[agent])
         elif self.solve_type == "linalg":
             self.replan_on_goal_claim = False
-            self.cheapest_solution = self.scheduler.find_linalg_solution()
+            self.full_solution = self.scheduler.find_linalg_solution()
 
-    def step_environment(self):
-        for agent, goal_list in self.cheapest_solution.items():
+    def step_environment(self, fast=False):
+        for agent, goal_list in self.full_solution.items():
             for i, goal in enumerate(goal_list):
                 if goal.claimed:
                     continue
-                self.assign_goal_to_agent(agent=agent, goal=goal_list[i])
-                break
-        self.update()
+                self.scheduler.goal_assignments[agent] = goal
+                break # OH MY GOD DO NOT REMOVE THIS BREAK
+        self.update(fast=fast)
 
-    def solve_cheapest_solution(self, max_iterations = None):
+    def solve_full_solution(self, fast=False):
         
-        self.reset(randomize_skills=False, randomize_goal_positions=False, randomize_agent_positions=False)
+        self.soft_reset()
         
-        if max_iterations is None:
-            max_iterations = self.size**2
+        solving_bench: Benchmark = Benchmark("solve_full_solution", start_now=True, silent=True)
+        while not (self.deadlocked or self.scheduler.all_goals_claimed()):
+            self.step_environment(fast=fast)
         
-        solving_bench: Benchmark = Benchmark("solve_cheapest_solution", start_now=True, silent=True)
-        for _ in range(max_iterations):
-            self.step_environment()
-            if self.scheduler.all_goals_claimed():
-                break
-        solving_bench.stop()
+        if self.deadlocked:
+            logging.debug("Deadlocked")
 
-        total_steps_moved = sum([agent.steps_moved for agent in self.agents])
-        total_steps_waited = sum([agent.steps_waited for agent in self.agents])
-        total_cost = sum([agent.accumulated_cost for agent in self.agents])
-        solve_time = solving_bench.elapsed_time
-        claimed_goals = len(self.goals) - len(self.scheduler.unclaimed_goals)
+        solve_time = solving_bench.stop()
 
-        return total_steps_moved, total_steps_waited, total_cost, solve_time, claimed_goals
+        total_steps, steps_waited, total_cost = self.get_agent_benchmarks()
+        amount_of_claimed_goals = len(self.goals) - len(self.scheduler.unclaimed_goals)
+
+        return total_steps, steps_waited, total_cost, solve_time, amount_of_claimed_goals
     
     def get_observation_vector(self):
         observation_vector = {
-            "goal_positions": [goal.position for goal in self.goals],
-            "goal_required_skills": [[(1 if skill in goal.required_skills else 0) for skill in range(self.num_skills)] 
-            for goal in self.goals],
-            "agent_positions": [agent.position for agent in self.agents],
-            "agent_skills": [[(1 if skill in agent.skills else 0) for skill in range(self.num_skills)] 
-            for agent in self.agents]
+            "map_elevations": self.grid_map.downscaled_data.flatten(),
+            "goal_positions": np.array([[goal.position[0],goal.position[1]] for goal in self.goals]).flatten(),
+            "goal_required_skills": np.array([[(1 if skill in goal.required_skills else 0) for skill in range(self.num_skills)] 
+            for goal in self.goals]).flatten(),
+            "agent_positions": np.array([[agent.position[0],agent.position[1]] for agent in self.agents]).flatten(),
+            "agent_skills": np.array([[(1 if skill in agent.skills else 0) for skill in range(self.num_skills)] 
+            for agent in self.agents]).flatten(),
+            "claimed_goals": len(self.goals) - len(self.scheduler.unclaimed_goals)
         }
         return observation_vector
     
     def get_action_vector(self):
         action_vector = []
         for agent in self.agents:
-            if agent in self.cheapest_solution:
-                goal_list = self.cheapest_solution[agent]
+            if agent in self.full_solution:
+                goal_list = self.full_solution[agent]
                 # Pad with -1 (or use `num_goals` as a dummy) if fewer than max_goals_per_agent
                 padded_goal_list = [self.goals.index(goal) for goal in goal_list] + [-1] * (len(self.goals) - len(goal_list))
                 action_vector.append(padded_goal_list)
             else:
                 # No goals, append `-1` for all slots
                 action_vector.append([-1] * len(self.goals))
-
+        
+        # Flatten the list for the MultiDiscrete action space
         flattened_action_vector = [goal for sublist in action_vector for goal in sublist]
+        
         return flattened_action_vector
-    
-    def set_cheapest_solution_from_action_vector(self, action_vector):
-        for i, agent in enumerate(self.agents):
-            if i < len(action_vector):
-                for goal_index in action_vector[i]:
-                    self.cheapest_solution[agent] = self.goals[goal_index]
 
-    def update(self):
+        
+    
+    def get_full_solution_from_action_vector(self, action_vector):
+        full_solution = {}
+        corrected_action = action_vector - 1
+        for flat_index, selected_goal in enumerate(corrected_action):
+            if selected_goal != -1:  # Only process if action is valid
+                # Compute agent and goal indices from flat_index
+                agent_index = flat_index // len(self.goals)
+                goal_index = flat_index % len(self.goals)
+                
+                agent = self.agents[agent_index]
+                goal = self.goals[goal_index]
+
+                # Add goal to the agent's full solution
+                if agent not in full_solution:
+                    full_solution[agent] = []
+                full_solution[agent].append(goal)
+        return full_solution
+    
+    def update_agents_last_visited_goals(self):
         for agent in self.agents:
-            if agent in self.scheduler.goal_assignments:
-                goal = self.scheduler.goal_assignments[agent]
-                self.grid_map.assign_shortest_path_for_goal_to_agent(agent=agent, goal=goal)
-                action, action_cost = self.grid_map.get_move_and_cost_to_reach_next_position(agent)
-                agent.apply_action(action, action_cost)
+            for goal in self.goals:
+                if agent.position == goal.position:
+                    self.scheduler.last_visited_goals[agent] = goal
+
+
+    def update(self, fast=False):
+        agent_positions_start = [agent.position for agent in self.agents]
+        for agent,goal in self.scheduler.goal_assignments.items():
+            # if agent.position == agent.initial_position or (self.scheduler.last_visited_goals[agent] and not self.replan_on_goal_claim):
+            #     path,cost = agent.paths_and_costs_to_goals[goal]
+            #     self.grid_map.assign_path_to_agent(agent=agent, path=path)
+            # elif self.scheduler.last_visited_goals[agent] and agent.position == self.scheduler.last_visited_goals[agent].position:
+            #     path,cost = self.scheduler.last_visited_goals[agent].paths_and_costs_to_other_goals[goal]
+            #     self.grid_map.assign_path_to_agent(agent=agent, path=path)
+            # else:
+            self.grid_map.assign_shortest_path_for_goal_to_agent(agent=agent, goal=goal)
+            path = self.grid_map.paths[agent]
+            cost = self.grid_map.calculate_path_cost(path)
+            # if fast:
+            #     agent.move_to_position(goal.position)
+            #     agent.accumulated_cost += cost
+            #     agent.steps_moved += len(path)
+            # else:
+            action, action_cost = self.grid_map.get_move_and_cost_to_reach_next_position(agent)
+            agent.apply_action(action, action_cost)
 
         claimed_a_goal = self.scheduler.update_goal_statuses()
         if (claimed_a_goal and self.replan_on_goal_claim) or self.new_goal_added:
             self._replan()
+        
+        agent_positions_end = [agent.position for agent in self.agents]
+        if not self.scheduler.all_goals_claimed():
+            if agent_positions_start == agent_positions_end:
+                self.deadlocked = True
+            else:
+                self.deadlocked = False
+
 
     def _replan(self):
         self.connect_agents_and_goals()
@@ -353,6 +386,3 @@ class Environment:
                 agent_distances.append(abs(agent.position[0] - goal.position[0]) + abs(agent.position[1] - goal.position[1]))
             distances.extend(agent_distances)
         return distances
-    
-    def assign_goal_to_agent(self, agent: Agent, goal: Goal):
-        self.scheduler.goal_assignments[agent] = goal

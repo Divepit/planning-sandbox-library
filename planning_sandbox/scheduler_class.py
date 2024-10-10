@@ -11,6 +11,7 @@ class Scheduler:
         self.goals: List[Goal] = goals
         self.unclaimed_goals: List[Goal] = [goal for goal in goals if not goal.claimed]
         self.goal_assignments: Dict[Agent, Goal] = {}
+        self.last_visited_goals = {agent: None for agent in self.agents}
 
     def _get_agents_present_at_goal(self, goal: Goal):
         return [agent for agent in self.agents if agent.position == goal.position]
@@ -55,6 +56,7 @@ class Scheduler:
     def reset(self):
         self.goal_assignments = {}
         self.unclaimed_goals = [goal for goal in self.goals if not goal.claimed]
+        self.last_visited_goals = {agent: None for agent in self.agents}
 
     def get_normalized_claimed_goals(self):
         return [int(goal.claimed) for goal in self.goals]
@@ -103,9 +105,9 @@ class Scheduler:
     
     def find_fast_solution(self):
         cheapest_combinations = {} # goal: (combination, cost)
-        cheapest_solution: Dict[Agent, List[Goal]] = {} # agent: [goal]
+        full_solution: Dict[Agent, List[Goal]] = {} # agent: [goal]
         unaccounted_for_goals = set(self.unclaimed_goals)
-        while len(cheapest_solution) != len(self.agents):
+        while len(full_solution) != len(self.agents):
             for goal in unaccounted_for_goals:
                 sorted_combinations = iter(sorted(goal.agent_combinations_which_solve_goal.items(), key=lambda combo_and_cost: combo_and_cost[1]))
                 looking_for_goal_solution = True
@@ -115,7 +117,7 @@ class Scheduler:
                         looking_for_goal_solution = False
                     except StopIteration:
                         break
-                    if any([agent in cheapest_solution for agent in cheapest_goal_combination]):
+                    if any([agent in full_solution for agent in cheapest_goal_combination]):
                         looking_for_goal_solution = True
                         continue
                 if not looking_for_goal_solution:
@@ -131,7 +133,7 @@ class Scheduler:
                     goal_available = False
                     break
 
-                if any([agent in cheapest_solution for agent in cheapest_combination]):
+                if any([agent in full_solution for agent in cheapest_combination]):
                     continue
                 else:
                     break
@@ -141,16 +143,16 @@ class Scheduler:
                 break
 
             for agent in cheapest_combination:
-                cheapest_solution[agent] = [cheapest_goal]
+                full_solution[agent] = [cheapest_goal]
 
             unaccounted_for_goals.remove(cheapest_goal)
             cheapest_combinations.clear()
 
-        return cheapest_solution
+        return full_solution
     
     def find_optimal_solution(self):
         
-        cheapest_solution = None
+        full_solution = None
         cheapest_cost = np.inf
         all_goal_orders = iter(permutations(self.unclaimed_goals, len(self.unclaimed_goals)))
 
@@ -166,10 +168,10 @@ class Scheduler:
                             proposed_solution[agent] = []
                         proposed_solution[agent].append(goal)
                     proposed_solution_cost = self._calculate_cost_of_solution(solution=proposed_solution, max_cost=cheapest_cost)
-                if cheapest_solution is None or proposed_solution_cost < cheapest_cost:
-                    cheapest_solution = proposed_solution
+                if full_solution is None or proposed_solution_cost < cheapest_cost:
+                    full_solution = proposed_solution
                     cheapest_cost = proposed_solution_cost
-        return cheapest_solution
+        return full_solution
     
     def find_linalg_solution(self):
         agent_combination_vector = []

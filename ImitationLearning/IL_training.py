@@ -1,170 +1,85 @@
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import signal
-import torch
 import logging
-import pickle
-import numpy as np
+import copy
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-from ImitationLearning.IL_env import ILEnv
-from planning_sandbox.environment_class import Environment
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.callbacks import CheckpointCallback,BaseCallback
+from stable_baselines3 import A2C, PPO
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
-from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 
-from imitation.algorithms.bc import BC
-from imitation.data.types import Transitions
+from IL_env import ILEnv
+from planning_sandbox.environment_class import Environment
 
-def linear_schedule(initial_value: float):
-    def func(progress_remaining: float) -> float:
-        return progress_remaining * initial_value
-    return func
 
-class EarlyStoppingCallback(BaseCallback):
-    def __init__(self, verbose=0):
-        super(EarlyStoppingCallback, self).__init__(verbose)
-        self.should_stop = False
-        signal.signal(signal.SIGINT, self.signal_handler)
-
-    def signal_handler(self, sig, frame):
-        logging.debug("\nEarly stopping initiated. Completing the current update...")
-        self.should_stop = True
-
-    def _on_step(self) -> bool:
-        return not self.should_stop
-
-class TensorboardCallback(BaseCallback):
-    def __init__(self, save_freq=200000, verbose=0):
-        super().__init__(verbose)
-        self.episode_rewards = []
-        self.save_freq = save_freq
-        self.last_save = 0
-
-    def _on_step(self) -> bool:
-        for info in self.locals['infos']:
-            if 'episode' in info:
-                self.episode_rewards.append(info['episode']['r'])
-                self.logger.record("env/claimed_goals", info['episode']['claimed_goals'])
-                self.logger.record("env/invalid_actions", info['episode']['invalid_actions'])
-                self.logger.record("env/stay_actions", info['episode']['stay_actions'])
-                self.logger.record("env/goal_stay_actions", info['episode']['goal_stay_actions'])
-        
-        # Check if it's time to save the model
-        if self.num_timesteps - self.last_save >= self.save_freq:
-            model_path = f"ppo_custom_env_improved_goal_assignment_intermediate"
-            self.model.save(model_path)
-            logging.info(f"Model saved at {model_path}")
-            self.last_save = self.num_timesteps
-
-        return True
-
-def make_env(rank, num_agents, num_goals, size, num_skills, seed=0):
+def make_env(rank, template_env, seed=0):
+    logging.info(f"Creating environment {rank}")
     def _init():
-        sandbox_env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_skills=num_skills, use_geo_data=True)
-        env = ILEnv(env=sandbox_env)
+        sandbox_env = copy.deepcopy(template_env)
+        env = ILEnv(sandboxEnv=sandbox_env)
         env.reset(seed=seed + rank)
         return env
     set_random_seed(seed)
     return _init
 
+class TensorboardCallback(BaseCallback):
+    def __init__(self, verbose=1):
+        super().__init__(verbose)
+        self.episode_rewards = []
+
+    def _on_step(self) -> bool:
+        self.logger.dump(self.num_timesteps)
+        for info in self.locals['infos']:
+            if 'episode' in info:
+                logging.debug(info['episode'])
+                self.logger.record("env/episode_reward", info['episode']['r'])
+                self.logger.record("env/episode_steps", info['episode']['l'])
+                self.logger.record("env/distributed_goals", info['episode']['distributed_goals'])
+                self.logger.record("env/cost", info['episode']['cost'])
+                self.logger.record("env/claimed_goals", info['episode']['claimed_goals'])
+                self.episode_rewards.append(info['episode']['r'])
+            if 'terminal_observation' in info:
+                logging.debug(info['terminal_observation'])
+        return True
+
+checkpoint_callback = CheckpointCallback(
+  save_freq=200,
+  save_path="/Users/marco/Programming/PlanningEnvironmentLibrary/ImitationLearning/model_logs/",
+  name_prefix="rl_model",
+  save_replay_buffer=True,
+  save_vecnormalize=True,
+)
+
+def main():
+
+    logging.info("Creating template environment...")
+    eval_sandbox_env: Environment = Environment(size=100, num_agents=3, num_goals=5, num_skills=2, use_geo_data=True)
+    evalEnv = ILEnv(sandboxEnv=eval_sandbox_env)
+    logging.info("Checking environment...")
+    check_env(evalEnv, warn=True)
+
+    n_envs = 12
+    n_timesteps = 100000
+    logging.info(f"Creating {n_envs} environments...")
+
+
+    subproc_env = SubprocVecEnv([make_env(rank=i, template_env=eval_sandbox_env) for i in range(n_envs)])
+    norm_env = VecNormalize(subproc_env, norm_obs=False, norm_obs_keys=["map_elevations"])
+
+    model = A2C(
+        "MultiInputPolicy",
+        norm_env,
+        verbose=1,
+        tensorboard_log="/Users/marco/Programming/PlanningEnvironmentLibrary/ImitationLearning/tensorboard_logs/",
+        device="cpu"
+        )
+
+    logging.info(f"Training model for {n_timesteps} timesteps...")
+    model.learn(total_timesteps=n_timesteps,progress_bar=True, callback=[checkpoint_callback, TensorboardCallback()])
+
+
 if __name__ == "__main__":
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    logging.info(f"Using device: {device}")
-
-    num_envs = 12
-    logging.info(f"Number of environments: {num_envs}")
-
-    num_agents = 1
-    num_goals = 2
-    size = 32
-    num_skills = 1
-    max_steps = size*3
-
-
-
-    log_dir = "/Users/marco/Programming/PlanningEnvironmentLibrary/ImitationLearning/logs"
-    os.makedirs(log_dir, exist_ok=True)
-
-    pkl_save_file = '/Users/marco/Programming/PlanningEnvironmentLibrary/ImitationLearning/expert_data.pkl'
-    os.makedirs(os.path.dirname(pkl_save_file), exist_ok=True)
-
-    with open(pkl_save_file, 'rb') as f:
-        data = pickle.load(f)
-
-    raw_observations = data['observations']
-    raw_actions = data['actions']
-    
-    # Assuming raw_observations and raw_actions are already available
-    expert_observations = np.array(raw_observations)
-    expert_actions = np.array(raw_actions)
-
-    # Generating next_obs as a shifted version of obs (or a valid placeholder if needed)
-    next_observations = np.roll(expert_observations, -1, axis=0)  # Shift observations by 1 for next_obs
-
-    # Assuming you want to end the episode at the last transition, generate `dones`
-    dones = np.array([False] * (len(expert_observations) - 1) + [True])  # Convert list to NumPy array
-
-    # Now create the Transitions object
-    transitions = Transitions(
-        obs=expert_observations,
-        acts=expert_actions,
-        infos=[None for _ in expert_observations],
-        next_obs=next_observations,  # Provide valid next_obs here
-        dones=dones  # NumPy array for `dones`
-    )
-
-    env = SubprocVecEnv([make_env(rank=i, num_agents=num_agents, num_goals=num_goals, size=size, num_skills=num_skills) for i in range(num_envs)])
-    env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=10.)
-
-    rng = np.random.default_rng(0)
-    bc_trainer = BC(
-    observation_space=env.observation_space,
-    action_space=env.action_space,
-    demonstrations=transitions,
-    rng=rng,
-    )
-
-    bc_trainer.train(n_epochs=100)
-    bc_trainer.policy.save("/Users/marco/Programming/PlanningEnvironmentLibrary/ImitationLearning/bc_policy")
-
-    obs = env.reset()
-    action, _ = bc_trainer.policy.predict(obs)
-    obs, reward, done, info = env.step(action)
-    env.render()  # Optional: visualize the policy in action
-
-    # model = PPO(
-    #     "MlpPolicy",
-    #     env,
-    #     verbose=1,
-    #     n_steps=max_steps,
-    #     batch_size=max_steps*num_envs,
-    #     n_epochs=24,
-    #     learning_rate=linear_schedule(0.000075),
-    #     clip_range=0.8,
-    #     ent_coef=0.025,
-    #     policy_kwargs = dict(
-    #         net_arch=dict(pi=[128, 64, 32], vf=[64, 32]),
-    #         activation_fn=torch.nn.ReLU
-    #     ),
-    #     device=device,
-    #     tensorboard_log=log_dir,
-    # )
-
-    # total_timesteps = 500000000
-
-    # try:
-    #     model.learn(
-    #         total_timesteps=total_timesteps,
-    #         callback=[EarlyStoppingCallback(), TensorboardCallback(save_freq=10000)],
-    #         progress_bar=True
-    #     )
-    # except KeyboardInterrupt:
-    #     logging.info("\nTraining interrupted. Saving the model...")
-    # except Exception as e:
-    #     logging.error(f"An error occurred during training: {e}")
-    # finally:
-    #     model.save("ppo_custom_env_improved_goal_assignment")
-    #     logging.info("Training completed and model saved.")
+    main()

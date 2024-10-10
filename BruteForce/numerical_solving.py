@@ -12,60 +12,30 @@ import logging
 from planning_sandbox.environment_class import Environment
 from planning_sandbox.visualizer_class import Visualizer
 from planning_sandbox.agent_class import Agent
-from planning_sandbox.goal_class import Goal        
 from planning_sandbox.benchmark_class import Benchmark
 
 from copy import deepcopy
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def run_sim(env: Environment, speed, visualize=True, chance_of_adding_random_goal: float = 0):
-    computation_time = 0
+def run_sim(env: Environment, speed, visualize=True):
     
-    setup_bench = Benchmark('sim_setup',start_now=True, silent=True)
-
-    max_goals = len(env.goals)
-    
-    vis: Visualizer = Visualizer(env=env, speed=speed) if visualize else None
-
     compute_bench = Benchmark('compute',start_now=True, silent=True)
     env.find_numerical_solution()
-    computation_time += compute_bench.stop()
+    computation_time = compute_bench.stop()
 
-    done: bool = False
-    setup_bench.stop()
-
-    while not done:
+    while not env.scheduler.all_goals_claimed():
         
-        assert env.cheapest_solution, "No solution found"
+        assert env.full_solution, "No solution found"
 
-        bench_step = Benchmark('step',start_now=True, silent=True)
-
+        # TODO: FIX BENCHING OF STEPS - NOT NECESSARY IN ALL CASES
         compute_bench = Benchmark('compute',start_now=True, silent=True)
-        logging.debug("Stepping environment")
-        env.step_environment()
+        env.step_environment(fast=True)
         computation_time += compute_bench.stop()
-        
-        # random goal
-        if np.random.rand() < chance_of_adding_random_goal:
-            logging.debug("Adding random goal")
-            if len(env.scheduler.unclaimed_goals) < max_goals-1:
-                random_agent: Agent = np.random.choice(env.agents)
-                location = env.grid_map.random_valid_location_close_to_position(position=random_agent.position, max_distance=20)
-                env.add_random_goal(location=location)
-        
-        if vis:
-            logging.debug("Running visualization")
-            vis.run_step()
-        done = env.scheduler.all_goals_claimed()
-        if done:
-            logging.info("All goals claimed")
-            if vis:
-                logging.debug("Closing visualization")
-                vis.close()
-            bench_step.stop()
-            break
-        bench_step.stop()
+    
+    if visualize:
+        visualizer: Visualizer = Visualizer(env, speed=speed)
+        visualizer.visualise_full_solution()
 
     return computation_time
 
@@ -158,27 +128,8 @@ def plot_benchmarks(solve_types, results, num_agents, num_goals, num_skills, siz
 
     plt.show()
 
-# Some plotting functions written by chatGPT (https://chatgpt.com/share/66f558b4-9844-8008-8442-3e9021b9bbbd)
-def main():
-    
-    visualize = 1
-    iterations = 1
-    num_goals: int = 6
-    chance_of_adding_random_goal: float = 0
-    num_agents: int = 3
-    size: int = 100
-    num_skills: int = 2
-    velocity = 200 #m/s (max 200)
-    speed = velocity*1/5
-
-    solve_types = ['fast']
-    
-    
-    logging.info("Setting up environment...")
-    env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_skills=num_skills, use_geo_data=True)
-    
+def run_benchmarks_on_environments(env,solve_types, iterations, num_agents, num_goals, num_skills, size, speed, visualize):
     seed_envs = clone_environments(env, iterations)
-    
     results = {}
     for solve_type in solve_types:
         print(f"\nRunning simulations for solve type: {solve_type}")
@@ -187,14 +138,10 @@ def main():
         all_costs = []
         all_wait_times = []
         for env in seed_envs:
-            if len(runtimes) > 0:
-                time_left = round(np.mean(runtimes) * (iterations - len(runtimes)), 2)
-            else:
-                time_left = '...'
-            print(f"Progress: {len(runtimes)+1}/{iterations} | Expected time left: {time_left} seconds", end='\r')
+            print(f"Progress: {len(runtimes)+1}/{iterations}", end='\r')
             env_copy: Environment = deepcopy(env)
             env_copy.solve_type = solve_type
-            computation_time = run_sim(env=env_copy, speed=speed, visualize=visualize, chance_of_adding_random_goal=chance_of_adding_random_goal)
+            computation_time = run_sim(env=env_copy, speed=speed, visualize=visualize)
             runtimes.append(computation_time)
             total_steps, steps_waited, total_cost = env_copy.get_agent_benchmarks()
             all_steps.append(total_steps)
@@ -209,6 +156,26 @@ def main():
         }
     
     plot_benchmarks(solve_types, results, num_agents, num_goals, num_skills, size)
+
+# Some plotting functions written by chatGPT (https://chatgpt.com/share/66f558b4-9844-8008-8442-3e9021b9bbbd)
+def main():
+    
+    visualize = 1
+    iterations = 1
+    num_goals: int = 6
+    num_agents: int = 3
+    size: int = 100
+    num_skills: int = 2
+    velocity = 200 #m/s (max 200)
+    speed = velocity*1/5
+
+    solve_types = ['fast','optimal']
+    
+    
+    logging.info("Setting up environment...")
+    env = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_skills=num_skills, use_geo_data=True)
+
+    run_benchmarks_on_environments(env,solve_types, iterations, num_agents, num_goals, num_skills, size, speed, visualize)
 
 if __name__ == "__main__":
     # cProfile.run('main()', sort='cumtime')

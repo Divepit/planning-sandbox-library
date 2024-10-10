@@ -19,10 +19,9 @@ class Goal:
     def add_skill(self, skill):
         self.required_skills.append(skill)
 
-    def reset(self, position=None, randomize_skills=False):
+    def reset(self, position=None):
         self.claimed = False
-        if randomize_skills:
-            self.required_skills.clear()
+        self.required_skills.clear()
         self.agents_which_have_required_skills.clear()
         self.agent_combinations_which_solve_goal.clear()
         self.paths_and_costs_to_other_goals.clear()
@@ -32,12 +31,11 @@ class Goal:
             self.initial_position = position
 
     def soft_reset(self):
-        self.agents_which_have_required_skills.clear()
-        self.agent_combinations_which_solve_goal.clear()
-        self.cheapest_combination = (None,np.inf)
+        self.claimed = False
         
     def add_agent_which_has_required_skills(self, agent):
-        self.agents_which_have_required_skills.append(agent)
+        if agent not in self.agents_which_have_required_skills:
+            self.agents_which_have_required_skills.append(agent)
 
     def add_path_to_other_goal(self, goal, path, cost):
         self.paths_and_costs_to_other_goals[goal] = (path, cost)
