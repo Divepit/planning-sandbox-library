@@ -2,6 +2,8 @@ import sys
 import os
 import logging
 import copy
+import torch
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -16,7 +18,7 @@ from planning_sandbox.environment_class import Environment
 
 
 def make_env(rank, template_env, seed=0):
-    logging.info(f"Creating environment {rank}")
+    logging.info(f"Creating environment {rank+1}")
     def _init():
         sandbox_env = copy.deepcopy(template_env)
         env = ILEnv(sandboxEnv=sandbox_env)
@@ -35,11 +37,11 @@ class TensorboardCallback(BaseCallback):
         for info in self.locals['infos']:
             if 'episode' in info:
                 logging.debug(info['episode'])
-                self.logger.record("env/episode_reward", info['episode']['r'])
-                self.logger.record("env/episode_steps", info['episode']['l'])
-                self.logger.record("env/distributed_goals", info['episode']['distributed_goals'])
-                self.logger.record("env/cost", info['episode']['cost'])
-                self.logger.record("env/claimed_goals", info['episode']['claimed_goals'])
+                self.logger.record("env/ep_av_reward", info['episode']['r'])
+                self.logger.record("env/ep_av_distributed_goals", info['episode']['distributed_goals'])
+                self.logger.record("env/ep_av_unclaimed_goals", info['episode']['unclaimed_goals'])
+                self.logger.record("env/ep_av_cost", info['episode']['cost'])
+                self.logger.record("env/ep_av_length", info['episode']['episode_attempts'])
                 self.episode_rewards.append(info['episode']['r'])
             if 'terminal_observation' in info:
                 logging.debug(info['terminal_observation'])
@@ -69,16 +71,25 @@ def main():
     subproc_env = SubprocVecEnv([make_env(rank=i, template_env=eval_sandbox_env) for i in range(n_envs)])
     norm_env = VecNormalize(subproc_env, norm_obs=False, norm_obs_keys=["map_elevations"])
 
+    policy_kwargs = dict(activation_fn=torch.nn.ReLU,
+                     net_arch=[512,512,256,256])
+
     model = A2C(
         "MultiInputPolicy",
         norm_env,
+        n_steps=25,
         verbose=1,
         tensorboard_log="/Users/marco/Programming/PlanningEnvironmentLibrary/ImitationLearning/tensorboard_logs/",
-        device="cpu"
+        device="cpu",
+        policy_kwargs=policy_kwargs
         )
 
     logging.info(f"Training model for {n_timesteps} timesteps...")
-    model.learn(total_timesteps=n_timesteps,progress_bar=True, callback=[checkpoint_callback, TensorboardCallback()])
+    model.learn(
+        total_timesteps=n_timesteps,
+        progress_bar=True,
+        callback=[checkpoint_callback, TensorboardCallback()],
+        )
 
 
 if __name__ == "__main__":

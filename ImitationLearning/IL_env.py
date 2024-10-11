@@ -16,57 +16,41 @@ class ILEnv(gym.Env):
         super(ILEnv, self).__init__()
         self.render_mode = render_mode
         self.sandboxEnv: Environment = sandboxEnv
-        # self.vis = Visualizer(env=self.sandboxEnv, speed=200)
-        self.step_count = 0
-        self.max_steps = self.sandboxEnv.size ** 2
-        self.max_episode_attempts = 2000
-        self.reward = 0
-        self.total_reward = 0
-        
-        # self.action_space = gym.spaces.MultiDiscrete(
-        #     nvec=[[len(self.sandboxEnv.goals)+1]*len(self.sandboxEnv.goals)]*len(self.sandboxEnv.agents),
-        #     start=[[0]*len(self.sandboxEnv.goals)]*len(self.sandboxEnv.agents),
-        #     dtype=np.int64
-        #     )
-        self.action_space = gym.spaces.MultiDiscrete(
-            nvec=[len(self.sandboxEnv.goals)+1]*len(self.sandboxEnv.agents)*len(self.sandboxEnv.goals),
-            start=[0]*len(self.sandboxEnv.agents)*len(self.sandboxEnv.goals),
-            dtype=np.int64
-)
-        
-        self.observation_space = Dict(
-            {   
-                "map_elevations": Box(low=-1500, high=1500, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.float32),
-                "goal_positions": MultiDiscrete(
-                nvec=[self.sandboxEnv.size]*len(self.sandboxEnv.goals)*2,
-                start=[0]*2*len(self.sandboxEnv.goals),
-                dtype=np.int64
-                ),
-                "goal_required_skills": MultiDiscrete(
-                nvec=[2]*self.sandboxEnv.num_skills*len(self.sandboxEnv.goals),
-                start=[0]*self.sandboxEnv.num_skills*len(self.sandboxEnv.goals),
-                dtype=np.int64
-                ),
-                "agent_positions": MultiDiscrete(
-                nvec=[self.sandboxEnv.size]*len(self.sandboxEnv.agents)*2,
-                start=[0]*2*len(self.sandboxEnv.agents),
-                dtype=np.int64
-                ),
-                "agent_skills": MultiDiscrete(
-                nvec=[2]*self.sandboxEnv.num_skills*len(self.sandboxEnv.agents),
-                start=[0]*self.sandboxEnv.num_skills*len(self.sandboxEnv.agents),
-                dtype=np.int64
-                ),
-                "claimed_goals": Discrete(len(self.sandboxEnv.goals)+1, start=0),
-            }
-        )
+        self.max_episode_attempts = 100000
         
 
+        self.step_count = 0
         self.episode_reward = 0
         self.episode_claimed_goals = 0
         self.episode_attempts = 0
         self.episode_distributed_goals = 0
         self.episode_cost = 0
+
+
+        self.action_space = gym.spaces.MultiDiscrete(
+            nvec=[len(self.sandboxEnv.goals)+1]*len(self.sandboxEnv.agents)*len(self.sandboxEnv.goals),
+            start=[0]*len(self.sandboxEnv.agents)*len(self.sandboxEnv.goals),
+            dtype=np.int64
+        )
+        
+        self.observation_space = Dict(
+            {   
+                "claimed_goals": Box(low=0, high=1, shape=(len(self.sandboxEnv.goals),), dtype=np.int16),
+                "map_elevations": Box(low=-1, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.int16),
+                "goal_positions": Box(low=0, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.int16),
+                "agent_positions": Box(low=0, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.int16),
+                "goal_required_skills": MultiDiscrete(
+                nvec=[2]*self.sandboxEnv.num_skills*len(self.sandboxEnv.goals),
+                start=[0]*self.sandboxEnv.num_skills*len(self.sandboxEnv.goals),
+                dtype=np.int16
+                ),
+                "agent_skills": MultiDiscrete(
+                nvec=[2]*self.sandboxEnv.num_skills*len(self.sandboxEnv.agents),
+                start=[0]*self.sandboxEnv.num_skills*len(self.sandboxEnv.agents),
+                dtype=np.int16
+                ),
+            }
+        )
 
     def step(self, action):
         corrected_action = action-1
@@ -85,42 +69,36 @@ class ILEnv(gym.Env):
         ]
         
         for agent_index, actions in enumerate(agent_actions):
+            agent = self.sandboxEnv.agents[agent_index]
             valid_goals = [goal for goal in actions if goal != -1]  # Filter out `-1`
-            self.sandboxEnv.full_solution[self.sandboxEnv.agents[agent_index]] = [self.sandboxEnv.goals[goal] for goal in valid_goals]
+            self.sandboxEnv.full_solution[agent] = [self.sandboxEnv.goals[goal] for goal in valid_goals]
             distributed_goals += len(valid_goals)
         
+        total_cost = self.sandboxEnv._calculate_cost_of_closed_solution(self.sandboxEnv.full_solution, max_cost=np.inf)
+        self.sandboxEnv.solve_full_solution(fast=True)
+        all_goals_claimed = self.sandboxEnv.scheduler.all_goals_claimed()
 
 
-        total_steps_moved, total_steps_waited, total_cost, solve_time, claimed_goals = self.sandboxEnv.solve_full_solution(fast=True)
 
-        unclaimed_goals = len(self.sandboxEnv.scheduler.unclaimed_goals)
 
-        reward -= total_cost
-        reward -= unclaimed_goals * 500
-        reward -= distributed_goals * 200
 
-        if self.step_count >= self.max_steps and not self.sandboxEnv.scheduler.all_goals_claimed():
-            reward -= 1000
-
-        self.step_count += total_steps_moved + total_steps_waited
+        reward -= (total_cost/self.sandboxEnv.size)
+        reward -= ((distributed_goals-len(self.sandboxEnv.goals))**2)/len(self.sandboxEnv.goals)
+        if not all_goals_claimed:
+            reward -= 100
         self.episode_reward += reward
-        self.episode_claimed_goals += claimed_goals
         self.episode_distributed_goals += distributed_goals
         self.episode_cost += total_cost
 
         logging.debug("Reward: {}".format(reward))
-        logging.debug("Total Steps Moved: {}".format(total_steps_moved))
-        logging.debug("Total Steps Waited: {}".format(total_steps_waited))
         logging.debug("Total Cost: {}".format(total_cost))
-        logging.debug("Solve Time: {}".format(solve_time))
-        logging.debug("Claimed Goals: {}".format(claimed_goals))
         logging.debug("Unclaimed Goals: {}".format(len(self.sandboxEnv.scheduler.unclaimed_goals)))
 
 
-        done = self.sandboxEnv.scheduler.all_goals_claimed() or self.episode_attempts >= self.max_episode_attempts
+        done = all_goals_claimed or self.episode_attempts >= self.max_episode_attempts
 
         if done:
-            info = {"episode": {"r": self.episode_reward/self.episode_attempts, "l": self.step_count/self.episode_attempts, "distributed_goals": self.episode_distributed_goals/self.episode_attempts, "cost": self.episode_cost/self.episode_attempts, "claimed_goals": self.episode_claimed_goals/self.episode_attempts}}
+            info = {"episode": {"r": self.episode_reward/self.episode_attempts, "l": self.episode_attempts,"distributed_goals": self.episode_distributed_goals/self.episode_attempts, "cost": self.episode_cost/self.episode_attempts, "unclaimed_goals": len(self.sandboxEnv.scheduler.unclaimed_goals)/self.episode_attempts, "episode_attempts": self.episode_attempts}}
         else:
             info = {}
 
@@ -142,6 +120,6 @@ class ILEnv(gym.Env):
     
     def render(self):
         vis = Visualizer(env=self.sandboxEnv, speed=200)
-        vis.visualise_full_solution(max_iterations=self.max_steps)
+        vis.visualise_full_solution()
         del vis
         

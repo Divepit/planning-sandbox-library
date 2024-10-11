@@ -36,6 +36,7 @@ class GridMap:
         self.graph = None
         self.is_connected = False
 
+        self.path_lookup_table = {}
 
         self.paths = {}
         
@@ -181,7 +182,11 @@ class GridMap:
         return agent.position
         
     def calculate_path_cost(self, path):
-        if self.use_geo_data:
+        start = path[0]
+        goal = path[-1]
+        if (start,goal) in self.path_lookup_table:
+            return self.path_lookup_table[(start,goal)][1]
+        elif self.use_geo_data:
             return nx.path_weight(self.graph, path, weight="weight")
         else:
             return nx.path_weight(self.graph, path)
@@ -196,10 +201,16 @@ class GridMap:
         return pos
     
     def shortest_path(self, start, goal):
+        if (start, goal) in self.path_lookup_table:
+            path, cost = self.path_lookup_table[(start, goal)]
         if self.use_geo_data:
             path = nx.astar_path(G=self.graph, source=start, target=goal, weight="weight")
         else:
             path = nx.astar_path(G=self.graph, source=start, target=goal)
+        
+        cost = self.calculate_path_cost(path)
+        self.path_lookup_table[(start, goal)] = (path, cost)
+
         return path
     
     def get_normalized_positions(self, positions):

@@ -1,7 +1,7 @@
-from typing import List
-
-import copy
+from typing import List, Dict
 import logging
+
+from itertools import permutations, product, combinations
 
 from planning_sandbox.grid_map_class import GridMap
 from planning_sandbox.agent_class import Agent
@@ -32,20 +32,31 @@ class Environment:
         self.grid_map = GridMap(self.size, use_geo_data=use_geo_data)
         self._starting_position = self.grid_map.random_valid_position()
 
-        self._init()
+        self.initialised = False
+        self.agents_goals_connected = False
         
+        self._init()
         self._log_environment_info()
 
     def _init(self):
+        assert not self.initialised, "Environment already initialised"
         self._initialize_goals()
         self._initialize_agents()
 
         while not self._all_skills_represented():
             self._reset_skills()
             self._initialize_skills()
+        
+        self.scheduler.reset()
+        
+        self.initialised = True
 
+    def _init_agent_goal_connections(self):
+        assert self.initialised, "Environment not initialised"
+        assert not self.agents_goals_connected, "Agents and goals already connected"
         self.connect_agents_and_goals()
         self.inform_goals_of_costs_to_other_goals()
+        self.agents_goals_connected = True
 
     def _log_environment_info(self):
         logging.debug(f"=== Environment settings ===")
@@ -68,6 +79,7 @@ class Environment:
         for _ in range(self._initial_num_goals):
             random_position = self.grid_map.random_valid_position()
             self._add_goal(random_position)
+        self.new_goal_added = False
 
     def _add_goal(self, position):
         goal: Goal = Goal(position)
@@ -76,7 +88,6 @@ class Environment:
         return goal
 
     def _initialize_skills(self):
-
         if self.num_skills == 1:
             for goal in self.goals:
                 if goal.required_skills == []:
@@ -177,28 +188,22 @@ class Environment:
         self.scheduler.reset()
 
     def reset(self):
+        self.initialised = False
         self.deadlocked = False
+        self.agents_goals_connected = False
         self.grid_map.reset()
-        for goal in self.goals:
-            new_position = self.grid_map.random_valid_position()
-            goal.reset(new_position)
-
+        self.full_solution = {}
         self._starting_position = self.grid_map.random_valid_position()
-
-        for agent in self.agents:
-            agent.reset(self._starting_position)
-
-        while not self._all_skills_represented():
-            self._reset_skills()
-            self._initialize_skills()
+        self.goals.clear()
+        self.agents.clear()
+        self._init()
+        
+        
 
 
-        self.scheduler.reset()
-
-        self.connect_agents_and_goals()
-        self.inform_goals_of_costs_to_other_goals()
 
     def get_normalized_skill_vectors_for_all_agents(self):
+        assert self.initialised, "Environment not initialised"
         all_skills_normalized = []
         for agent in self.agents:
             agent_skills_normalized = [0]*self.num_skills
@@ -208,6 +213,7 @@ class Environment:
         return all_skills_normalized
     
     def get_normalized_skill_vectors_for_all_goals(self):
+        assert self.initialised, "Environment not initialised"
         all_skills_normalized = []
         for goal in self.goals:
             goal_skills_normalized = [0]*self.num_skills
@@ -216,10 +222,14 @@ class Environment:
             all_skills_normalized.extend(goal_skills_normalized)
         return all_skills_normalized        
 
-    def find_numerical_solution(self):
+    def find_numerical_solution(self, solve_type=None):
+        if not self.agents_goals_connected:
+            self._init_agent_goal_connections()
+        if solve_type is not None:
+            self.solve_type = solve_type
         if self.solve_type == "optimal":
             self.replan_on_goal_claim = False
-            self.full_solution = self.scheduler.find_optimal_solution()
+            self.full_solution = self.find_optimal_solution()
         elif self.solve_type == "fast":
             self.replan_on_goal_claim = True
             if self.full_solution is None:
@@ -231,16 +241,19 @@ class Environment:
                 self.full_solution[agent].extend(intermediate_solution[agent])
         elif self.solve_type == "linalg":
             self.replan_on_goal_claim = False
-            self.full_solution = self.scheduler.find_linalg_solution()
+            self.full_solution = self.find_linalg_solution()
+        return self.full_solution
 
     def step_environment(self, fast=False):
+        logging.debug("Stepping environment")
         for agent, goal_list in self.full_solution.items():
             for i, goal in enumerate(goal_list):
                 if goal.claimed:
                     continue
                 self.scheduler.goal_assignments[agent] = goal
                 break # OH MY GOD DO NOT REMOVE THIS BREAK
-        self.update(fast=fast)
+        not_deadlocked = self.update(fast=fast)
+        return not_deadlocked
 
     def solve_full_solution(self, fast=False):
         
@@ -261,15 +274,28 @@ class Environment:
         return total_steps, steps_waited, total_cost, solve_time, amount_of_claimed_goals
     
     def get_observation_vector(self):
+        goals_map = np.zeros((self.size, self.size), dtype=np.int16)
+        for goal in self.goals:
+            goals_map[goal.position[0], goal.position[1]] = 1
+        agents_map = np.zeros((self.size, self.size), dtype=np.int16)
+        for agent in self.agents:
+            agents_map[agent.position[0], agent.position[1]] = 1
+
+        flattened_map = self.grid_map.downscaled_data.flatten()
+        min_value = np.min(flattened_map)
+        max_value = np.max(flattened_map)
+        normalized_map = 2*((flattened_map - min_value) / (max_value - min_value))-1
+
         observation_vector = {
-            "map_elevations": self.grid_map.downscaled_data.flatten(),
-            "goal_positions": np.array([[goal.position[0],goal.position[1]] for goal in self.goals]).flatten(),
+            
+            "claimed_goals": np.array([1 if goal.claimed else 0 for goal in self.goals], dtype=np.int16),
+            "map_elevations": normalized_map.astype(np.int16),
+            "goal_positions": goals_map.flatten(),
+            "agent_positions": agents_map.flatten(),
             "goal_required_skills": np.array([[(1 if skill in goal.required_skills else 0) for skill in range(self.num_skills)] 
-            for goal in self.goals]).flatten(),
-            "agent_positions": np.array([[agent.position[0],agent.position[1]] for agent in self.agents]).flatten(),
+            for goal in self.goals], dtype=np.int16).flatten(),
             "agent_skills": np.array([[(1 if skill in agent.skills else 0) for skill in range(self.num_skills)] 
-            for agent in self.agents]).flatten(),
-            "claimed_goals": len(self.goals) - len(self.scheduler.unclaimed_goals)
+            for agent in self.agents], dtype=np.int16).flatten(),
         }
         return observation_vector
     
@@ -309,34 +335,21 @@ class Environment:
                     full_solution[agent] = []
                 full_solution[agent].append(goal)
         return full_solution
-    
-    def update_agents_last_visited_goals(self):
-        for agent in self.agents:
-            for goal in self.goals:
-                if agent.position == goal.position:
-                    self.scheduler.last_visited_goals[agent] = goal
 
 
     def update(self, fast=False):
+        logging.debug("Updating environment")
         agent_positions_start = [agent.position for agent in self.agents]
         for agent,goal in self.scheduler.goal_assignments.items():
-            # if agent.position == agent.initial_position or (self.scheduler.last_visited_goals[agent] and not self.replan_on_goal_claim):
-            #     path,cost = agent.paths_and_costs_to_goals[goal]
-            #     self.grid_map.assign_path_to_agent(agent=agent, path=path)
-            # elif self.scheduler.last_visited_goals[agent] and agent.position == self.scheduler.last_visited_goals[agent].position:
-            #     path,cost = self.scheduler.last_visited_goals[agent].paths_and_costs_to_other_goals[goal]
-            #     self.grid_map.assign_path_to_agent(agent=agent, path=path)
-            # else:
-            self.grid_map.assign_shortest_path_for_goal_to_agent(agent=agent, goal=goal)
-            path = self.grid_map.paths[agent]
-            cost = self.grid_map.calculate_path_cost(path)
-            # if fast:
-            #     agent.move_to_position(goal.position)
-            #     agent.accumulated_cost += cost
-            #     agent.steps_moved += len(path)
-            # else:
-            action, action_cost = self.grid_map.get_move_and_cost_to_reach_next_position(agent)
-            agent.apply_action(action, action_cost)
+            if (not self.replan_on_goal_claim) and fast:
+                logging.debug("Fast update")
+                agent.move_to_position(goal.position)
+            else:
+                self.grid_map.assign_shortest_path_for_goal_to_agent(agent=agent, goal=goal)
+                path = self.grid_map.paths[agent]
+                cost = self.grid_map.calculate_path_cost(path)
+                action, action_cost = self.grid_map.get_move_and_cost_to_reach_next_position(agent)
+                agent.apply_action(action, action_cost)
 
         claimed_a_goal = self.scheduler.update_goal_statuses()
         if (claimed_a_goal and self.replan_on_goal_claim) or self.new_goal_added:
@@ -348,9 +361,12 @@ class Environment:
                 self.deadlocked = True
             else:
                 self.deadlocked = False
+        logging.debug("Environment updated")
+        return not self.deadlocked
 
 
     def _replan(self):
+        logging.debug("Replanning")
         self.connect_agents_and_goals()
         new_goal = False
         for goal in self.goals:
@@ -371,18 +387,109 @@ class Environment:
             steps_waited += agent.steps_waited
             total_cost += agent.accumulated_cost
         return total_steps, steps_waited, total_cost
+
     
-    def get_manhattan_distance_to_closest_unclaimed_goal(self, agent: Agent):
-        distances = []
-        for goal in self.scheduler.unclaimed_goals:
-            distances.append(abs(agent.position[0] - goal.position[0]) + abs(agent.position[1] - goal.position[1]))
-        return min(distances)
+    def _calculate_cost_of_closed_solution(self, solution: Dict[Agent, List[Goal]], max_cost=np.inf) -> int:
+        solution_cost = 0
+        for agent, goals in solution.items():
+            cost, _ = self._calculate_cost_of_chain(agent, goals)
+            solution_cost += cost
+            if solution_cost > max_cost:
+                return np.inf
+        return solution_cost
     
-    def get_manhattan_distances_for_all_agents_to_all_goals(self):
-        distances = []
-        for agent in self.agents:
-            agent_distances = []
-            for goal in self.goals:
-                agent_distances.append(abs(agent.position[0] - goal.position[0]) + abs(agent.position[1] - goal.position[1]))
-            distances.extend(agent_distances)
-        return distances
+    def _calculate_cost_of_chain(self, agent: Agent, chain: List[Goal]):
+        cost = 0
+        length = 0
+        if not chain:
+            return cost, length
+        
+        first_goal = chain[0]
+
+        if self.agents_goals_connected and first_goal in agent.paths_and_costs_to_goals:
+            cost = agent.paths_and_costs_to_goals[first_goal][1]
+            length = len(agent.paths_and_costs_to_goals[first_goal][0])
+        else:
+            path = self.grid_map.generate_shortest_path_for_agent(agent, first_goal)
+            cost = self.grid_map.calculate_path_cost(path)
+            length = len(path)
+
+        for i in range(1,len(chain)):
+            previous_goal = chain[i-1]
+            current_goal = chain[i]
+            if previous_goal == current_goal:
+                continue
+            if self.agents_goals_connected:
+                cost += previous_goal.paths_and_costs_to_other_goals[current_goal][1]
+                length += len(previous_goal.paths_and_costs_to_other_goals[current_goal][0])
+            else:
+                path = self.grid_map.shortest_path(previous_goal.position, current_goal.position)
+                cost += self.grid_map.calculate_path_cost(path)
+                length += len(path)
+        return cost, length
+    
+    def find_optimal_solution(self):
+        assert self.agents_goals_connected, "Agents and goals not connected"
+        logging.debug("Finding optimal solution")
+        full_solution = None
+        cheapest_cost = np.inf
+        all_goal_orders = iter(permutations(self.scheduler.unclaimed_goals, len(self.scheduler.unclaimed_goals)))
+        for goal_order in all_goal_orders:
+            candidate_permutations =iter(product(*[goal.agent_combinations_which_solve_goal.keys() for goal in goal_order]))
+            for candidate_permutation in candidate_permutations:
+                proposed_solution = {}
+                proposed_solution_cost = np.inf
+                for i, agent_list in enumerate(candidate_permutation):
+                    goal = goal_order[i]
+                    for agent in agent_list:
+                        if agent not in proposed_solution:
+                            proposed_solution[agent] = []
+                        proposed_solution[agent].append(goal)
+                    proposed_solution_cost = self._calculate_cost_of_closed_solution(solution=proposed_solution, max_cost=cheapest_cost)
+                if full_solution is None or proposed_solution_cost < cheapest_cost:
+                    full_solution = proposed_solution
+                    cheapest_cost = proposed_solution_cost
+        return full_solution
+    
+    def find_linalg_solution(self):
+        assert self.agents_goals_connected, "Environment not initialised"
+        logging.debug("Finding optimal solution")
+        agent_combination_vector = []
+        for r in range(1, len(self.agents)+1):
+            agent_combination_vector.extend(combinations(self.agents, r))
+        
+        goal_permutation_vector = []
+        for r in range(1, len(self.scheduler.unclaimed_goals)+1):
+            goal_permutation_vector.extend(permutations(self.scheduler.unclaimed_goals, r))
+        
+        agent_combination_goal_permutation_matrix = np.zeros((len(agent_combination_vector), len(goal_permutation_vector)))
+
+        for i,agent_combination in enumerate(agent_combination_vector):
+            for j,goal_permutation in enumerate(goal_permutation_vector):
+                if all([goal_permutation[0] in agent.paths_and_costs_to_goals.keys() for agent in agent_combination]) and all([self.agent_combination_has_required_skills_for_goal(agent_combination, goal) for goal in goal_permutation]):
+                    agent_combination_goal_permutation_matrix[i,j] = np.sum([self._calculate_cost_of_chain(agent, goal_permutation) for agent in agent_combination])
+                else:
+                    agent_combination_goal_permutation_matrix[i,j] = np.inf
+
+        sorted_indices = np.argsort(agent_combination_goal_permutation_matrix, axis=None)
+
+        rows, cols = np.unravel_index(sorted_indices, agent_combination_goal_permutation_matrix.shape)
+
+        covered_goals = set()
+        busy_agents = set()
+        solution = {}
+        for r, c in zip(rows, cols):
+            agent_combination = agent_combination_vector[r]
+            goal_permutation = goal_permutation_vector[c]
+            if any([goal in covered_goals for goal in goal_permutation]):
+                continue
+            for agent in agent_combination:
+                busy_agents.add(agent)
+                if agent not in solution:
+                    solution[agent] = []
+                solution[agent].extend(goal_permutation)
+            for goal in goal_permutation_vector[c]:
+                covered_goals.add(goal)
+            if len(covered_goals) == len(self.scheduler.unclaimed_goals):
+                break
+        return solution

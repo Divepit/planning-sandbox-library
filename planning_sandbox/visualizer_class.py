@@ -1,5 +1,7 @@
 import pygame
+import logging
 import numpy as np
+import time
 
 from planning_sandbox.environment_class import Environment
 
@@ -17,7 +19,7 @@ TEXT = (50, 50, 50)
 CELL_SIZE = 5
 
 class Visualizer:
-    def __init__(self, env: Environment, speed=20):
+    def __init__(self, env: Environment, speed=200):
         self.env = env
         self.speed = speed
         self.setup_pygame()
@@ -160,6 +162,7 @@ class Visualizer:
                     pygame.draw.line(self.screen, PATH, start, end, 2)
 
     def run_step(self):
+        logging.debug("Running visualisation step")
         clock = pygame.time.Clock()
         self.draw_grid()
         self.draw_paths()  # Draw paths before goals and agents
@@ -172,7 +175,10 @@ class Visualizer:
     def close(self):
         pygame.quit()
 
-    def visualise_full_solution(self, max_iterations = None):
+    def visualise_full_solution(self, max_iterations = None, fast=False):
+        if fast:
+            logging.debug("Visualising fast solution")
+            
         self.env.soft_reset()
         self.setup_pygame()
         
@@ -180,10 +186,12 @@ class Visualizer:
             max_iterations = self.size**2
         
         for _ in range(max_iterations):
-            self.env.step_environment(fast=False)
+            not_deadlocked = self.env.step_environment(fast=fast)
             self.run_step()
-            if self.env.scheduler.all_goals_claimed():
+            if self.env.scheduler.all_goals_claimed() or not not_deadlocked:
                 break
-
+        if not not_deadlocked:
+            logging.warning("Terminated visualisation due to deadlock")
+            time.sleep(1)
         self.close()
     

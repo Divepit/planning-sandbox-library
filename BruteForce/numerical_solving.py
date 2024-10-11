@@ -16,7 +16,7 @@ from planning_sandbox.benchmark_class import Benchmark
 
 from copy import deepcopy
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def run_sim(env: Environment, speed, visualize=True):
     
@@ -30,12 +30,12 @@ def run_sim(env: Environment, speed, visualize=True):
 
         # TODO: FIX BENCHING OF STEPS - NOT NECESSARY IN ALL CASES
         compute_bench = Benchmark('compute',start_now=True, silent=True)
-        env.step_environment(fast=True)
+        env.step_environment(fast=False)
         computation_time += compute_bench.stop()
     
     if visualize:
         visualizer: Visualizer = Visualizer(env, speed=speed)
-        visualizer.visualise_full_solution()
+        visualizer.visualise_full_solution(fast=False)
 
     return computation_time
 
@@ -141,6 +141,7 @@ def run_benchmarks_on_environments(env,solve_types, iterations, num_agents, num_
             print(f"Progress: {len(runtimes)+1}/{iterations}", end='\r')
             env_copy: Environment = deepcopy(env)
             env_copy.solve_type = solve_type
+            env_copy.replan_on_goal_claim = solve_type == 'fast'
             computation_time = run_sim(env=env_copy, speed=speed, visualize=visualize)
             runtimes.append(computation_time)
             total_steps, steps_waited, total_cost = env_copy.get_agent_benchmarks()
