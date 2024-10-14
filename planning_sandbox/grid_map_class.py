@@ -2,13 +2,16 @@ import networkx as nx
 import numpy as np
 import time
 import logging
+import os
 from PIL import Image
 from skimage.transform import resize
 
 from planning_sandbox.agent_class import Agent
 from planning_sandbox.goal_class import Goal
 
-TIF = '/Users/marco/Programming/PlanningEnvironmentLibrary/planning_sandbox/maps/shoemaker_ele_5mpp.tif'
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
+TIF = dir_path+'/maps/shoemaker_ele_5mpp.tif'
 MPP = 5
 WINDOW_SIZE = 4000
 X_OFFSET = 0
