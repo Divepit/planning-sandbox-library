@@ -85,10 +85,8 @@ class ILEnv(gym.Env):
 
 
         reward -= total_cost/len(self.sandboxEnv.agents)
-        # reward -= 0.5*((distributed_goals-len(self.sandboxEnv.goals))**2)/len(self.sandboxEnv.goals)
 
         if not all_goals_claimed or self.sandboxEnv.deadlocked:
-            # reward -= 100
             reward -= 100*len(self.sandboxEnv.scheduler.unclaimed_goals)
 
         self.episode_reward += reward
