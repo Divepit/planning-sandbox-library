@@ -285,11 +285,12 @@ class Environment:
         min_value = np.min(flattened_map)
         max_value = np.max(flattened_map)
         normalized_map = 2*((flattened_map - min_value) / (max_value - min_value))-1
+    
 
         observation_vector = {
             
             "claimed_goals": np.array([1 if goal.claimed else 0 for goal in self.goals], dtype=np.int16),
-            "map_elevations": normalized_map.astype(np.int16),
+            "map_elevations": normalized_map.astype(np.float32),
             "goal_positions": goals_map.flatten(),
             "agent_positions": agents_map.flatten(),
             "goal_required_skills": np.array([[(1 if skill in goal.required_skills else 0) for skill in range(self.num_skills)] 
@@ -299,6 +300,7 @@ class Environment:
         }
         return observation_vector
     
+    # has to start at 0, not at -1
     def get_action_vector(self):
         action_vector = []
         for agent in self.agents:
@@ -312,23 +314,21 @@ class Environment:
                 action_vector.append([-1] * len(self.goals))
         
         # Flatten the list for the MultiDiscrete action space
-        flattened_action_vector = [goal for sublist in action_vector for goal in sublist]
+        flattened_action_vector = [goal+1 for sublist in action_vector for goal in sublist]
         
         return flattened_action_vector
 
-        
-    
+    # has to start at 0, not at -1
     def get_full_solution_from_action_vector(self, action_vector):
         full_solution = {}
-        corrected_action = action_vector - 1
-        for flat_index, selected_goal in enumerate(corrected_action):
-            if selected_goal != -1:  # Only process if action is valid
+        action_vector = action_vector
+        for flat_index, selected_goal in enumerate(action_vector):
+            if selected_goal-1 != -1:  # Only process if action is valid
                 # Compute agent and goal indices from flat_index
                 agent_index = flat_index // len(self.goals)
-                goal_index = flat_index % len(self.goals)
                 
                 agent = self.agents[agent_index]
-                goal = self.goals[goal_index]
+                goal = self.goals[selected_goal-1]
 
                 # Add goal to the agent's full solution
                 if agent not in full_solution:

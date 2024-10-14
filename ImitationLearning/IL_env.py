@@ -16,7 +16,7 @@ class ILEnv(gym.Env):
         super(ILEnv, self).__init__()
         self.render_mode = render_mode
         self.sandboxEnv: Environment = sandboxEnv
-        self.max_episode_attempts = 100000
+        self.max_episode_attempts = 150
         
 
         self.step_count = 0
@@ -25,6 +25,8 @@ class ILEnv(gym.Env):
         self.episode_attempts = 0
         self.episode_distributed_goals = 0
         self.episode_cost = 0
+        self.episode_deadlocks = 0
+        self.episode_unclaimed_goals = 0
 
 
         self.action_space = gym.spaces.MultiDiscrete(
@@ -36,7 +38,7 @@ class ILEnv(gym.Env):
         self.observation_space = Dict(
             {   
                 "claimed_goals": Box(low=0, high=1, shape=(len(self.sandboxEnv.goals),), dtype=np.int16),
-                "map_elevations": Box(low=-1, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.int16),
+                "map_elevations": Box(low=-1, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.float32),
                 "goal_positions": Box(low=0, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.int16),
                 "agent_positions": Box(low=0, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.int16),
                 "goal_required_skills": MultiDiscrete(
@@ -82,23 +84,28 @@ class ILEnv(gym.Env):
 
 
 
-        reward -= (total_cost/self.sandboxEnv.size)
-        reward -= ((distributed_goals-len(self.sandboxEnv.goals))**2)/len(self.sandboxEnv.goals)
-        if not all_goals_claimed:
-            reward -= 100
+        reward -= total_cost/len(self.sandboxEnv.agents)
+        # reward -= 0.5*((distributed_goals-len(self.sandboxEnv.goals))**2)/len(self.sandboxEnv.goals)
+
+        if not all_goals_claimed or self.sandboxEnv.deadlocked:
+            # reward -= 100
+            reward -= 100*len(self.sandboxEnv.scheduler.unclaimed_goals)
+
         self.episode_reward += reward
         self.episode_distributed_goals += distributed_goals
         self.episode_cost += total_cost
+        self.episode_deadlocks += int(self.sandboxEnv.deadlocked)
+        self.episode_unclaimed_goals += len(self.sandboxEnv.scheduler.unclaimed_goals)
 
         logging.debug("Reward: {}".format(reward))
         logging.debug("Total Cost: {}".format(total_cost))
         logging.debug("Unclaimed Goals: {}".format(len(self.sandboxEnv.scheduler.unclaimed_goals)))
 
 
-        done = all_goals_claimed or self.episode_attempts >= self.max_episode_attempts
+        done = self.episode_attempts >= self.max_episode_attempts
 
         if done:
-            info = {"episode": {"r": self.episode_reward/self.episode_attempts, "l": self.episode_attempts,"distributed_goals": self.episode_distributed_goals/self.episode_attempts, "cost": self.episode_cost/self.episode_attempts, "unclaimed_goals": len(self.sandboxEnv.scheduler.unclaimed_goals)/self.episode_attempts, "episode_attempts": self.episode_attempts}}
+            info = {"episode": {"r": self.episode_reward/self.episode_attempts, "l": self.episode_attempts,"distributed_goals": self.episode_distributed_goals/self.episode_attempts, "cost": self.episode_cost/self.episode_attempts, "unclaimed_goals": self.episode_unclaimed_goals/self.episode_attempts, "episode_attempts": self.episode_attempts, "deadlocks": self.episode_deadlocks/self.episode_attempts}}
         else:
             info = {}
 
@@ -115,7 +122,9 @@ class ILEnv(gym.Env):
         self.episode_distributed_goals = 0
         self.episode_cost = 0
         self.step_count = 0
+        self.episode_deadlocks = 0
         self.sandboxEnv.reset()
+        self.episode_unclaimed_goals = 0
         return self.sandboxEnv.get_observation_vector(), {}
     
     def render(self):

@@ -42,6 +42,7 @@ class TensorboardCallback(BaseCallback):
                 self.logger.record("env/ep_av_unclaimed_goals", info['episode']['unclaimed_goals'])
                 self.logger.record("env/ep_av_cost", info['episode']['cost'])
                 self.logger.record("env/ep_av_length", info['episode']['episode_attempts'])
+                self.logger.record("env/ep_av_deadlocks", info['episode']['deadlocks'])
                 self.episode_rewards.append(info['episode']['r'])
             if 'terminal_observation' in info:
                 logging.debug(info['terminal_observation'])
@@ -64,7 +65,7 @@ def main():
     check_env(evalEnv, warn=True)
 
     n_envs = 12
-    n_timesteps = 100000
+    n_timesteps = 500000
     logging.info(f"Creating {n_envs} environments...")
 
 
