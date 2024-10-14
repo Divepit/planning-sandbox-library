@@ -3,7 +3,7 @@ import copy
 import numpy as np
 import logging
 
-from gymnasium.spaces import Dict, MultiDiscrete, Discrete, Box
+from gymnasium.spaces import Dict, MultiDiscrete, Discrete, Box, MultiBinary
 
 from planning_sandbox.environment_class import Environment
 from planning_sandbox.visualizer_class import Visualizer
@@ -34,6 +34,7 @@ class ILEnv(gym.Env):
             start=[0]*len(self.sandboxEnv.agents)*len(self.sandboxEnv.goals),
             dtype=np.int64
         )
+
         
         self.observation_space = Dict(
             {   

@@ -2,16 +2,14 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logging
-import time
-import gymnasium as gym
+import numpy as np
+import pickle
 
 from planning_sandbox.environment_class import Environment
 from IL_env import ILEnv
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.evaluation import evaluate_policy
-from imitation.data.types import Trajectory
-from imitation.algorithms import sqil
-
+from imitation.algorithms import bc
 
 from copy import deepcopy
 
@@ -36,14 +34,14 @@ def test_env(env):
 
 
 def main():
+
+    dir_path = os.path.dirname(os.path.realpath(__file__))
     
-    num_goals: int = 6
+    num_goals: int = 5
     num_agents: int = 3
     size: int = 100
     num_skills: int = 2
     solve_type = 'optimal'
-    
-    amount_of_trajectories = 50
     
     
     logging.info("Setting up and testing environment...")
@@ -52,36 +50,26 @@ def main():
     test_env(env_for_test)
     check_env(env_for_check, warn=True)
 
-    logging.info("Generating trajectories...")
-    trajectories = []
+    # Save the trajectories to a file
+    with open(dir_path+'/trajectories.pkl', 'rb') as f:
+        trajectories = pickle.load(f)
+
     sandboxEnv = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_skills=num_skills, use_geo_data=True, solve_type=solve_type)
-    for _ in range(amount_of_trajectories):
-        print(f"Progress: {len(trajectories)+1}/{amount_of_trajectories}", end='\r')
-        sandboxEnv.find_numerical_solution(solve_type=solve_type)
-        new_trajectory = Trajectory(
-            obs=sandboxEnv.get_observation(),
-            acts=sandboxEnv.get_action_vector(),
-            infos={},
-            terminal=True
-        )
-        trajectories.append(new_trajectory)
-        sandboxEnv.reset()
+    training_env = ILEnv(sandboxEnv=sandboxEnv)
+    
 
-
-    sqil_trainer = sqil.SQIL(
-        venv=sandboxEnv,
+    bc_trainer = bc.BC(
+        observation_space=training_env.observation_space,
+        action_space=training_env.action_space,
         demonstrations=trajectories,
-        policy="MlpPolicy",
+        rng=np.random.default_rng(),
     )
 
-    reward_before_training, _ = evaluate_policy(sqil_trainer.policy, sandboxEnv, 10)
-    logging.info(f"Reward before training: {reward_before_training}")
+    bc_trainer.train(n_epochs=1077)
 
-    sqil_trainer.train(
-    total_timesteps=1_000,
-    )  # Note: set to 1_000_000 to obtain good results
-    reward_after_training, _ = evaluate_policy(sqil_trainer.policy, sandboxEnv, 10)
-    logging.info(f"Reward after training: {reward_after_training}")
+    reward, _ = evaluate_policy(model=bc_trainer.policy, env=training_env, n_eval_episodes=10, deterministic=True, render=True, return_episode_rewards=True)
+    logging.info(f"Mean reward: {reward}")
+
     
 
 if __name__ == "__main__":
