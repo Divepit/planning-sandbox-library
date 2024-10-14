@@ -16,6 +16,9 @@ from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from IL_env import ILEnv
 from planning_sandbox.environment_class import Environment
 
+home_directory = os.path.expanduser("~")
+this_directory = home_directory + "/Programming/PlanningEnvironmentLibrary/ImitationLearning"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def make_env(rank, template_env, seed=0):
     logging.info(f"Creating environment {rank+1}")
@@ -47,10 +50,10 @@ class TensorboardCallback(BaseCallback):
             if 'terminal_observation' in info:
                 logging.debug(info['terminal_observation'])
         return True
-
+    
 checkpoint_callback = CheckpointCallback(
   save_freq=200,
-  save_path="/Users/marco/Programming/PlanningEnvironmentLibrary/ImitationLearning/model_logs/",
+  save_path=this_directory+"/model_logs/",
   name_prefix="rl_model",
   save_replay_buffer=True,
   save_vecnormalize=True,
@@ -80,8 +83,8 @@ def main():
         norm_env,
         n_steps=25,
         verbose=1,
-        tensorboard_log="/Users/marco/Programming/PlanningEnvironmentLibrary/ImitationLearning/tensorboard_logs/",
-        device="cpu",
+        tensorboard_log=this_directory+"/tensorboard_logs/",
+        device=device,
         policy_kwargs=policy_kwargs
         )
 
