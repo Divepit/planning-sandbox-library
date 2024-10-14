@@ -17,7 +17,7 @@ from IL_env import ILEnv
 from planning_sandbox.environment_class import Environment
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda"
 
 def make_env(rank, template_env, seed=0):
     logging.info(f"Creating environment {rank+1}")
@@ -66,8 +66,8 @@ def main():
     logging.info("Checking environment...")
     check_env(evalEnv, warn=True)
 
-    n_envs = 12
-    n_timesteps = 500000
+    n_envs = 50
+    n_timesteps = 5000000
     logging.info(f"Creating {n_envs} environments...")
 
 

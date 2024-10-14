@@ -1,14 +1,31 @@
-# Use an official Python runtime as a parent image
-FROM python:3.10-slim
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu20.04
 
-# Set the working directory in the container
+# Set DEBIAN_FRONTEND to noninteractive to avoid prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe/Zurich  
+# Set a default timezone to avoid tzdata prompts
+
+# Install necessary dependencies including libGL and libglib2.0
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    tzdata && \
+    ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone && \
+    dpkg-reconfigure --frontend noninteractive tzdata
+
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
 COPY . /app
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Run the Python script when the container launches
-CMD ["python", "/app/ImitationLearning/IL_training.py"]
+# Expose port for TensorBoard
+EXPOSE 6006
+
+# Run your training script
+CMD ["python3", "/app/ImitationLearning/IL_training.py"]
+
