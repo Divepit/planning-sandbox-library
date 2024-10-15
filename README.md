@@ -21,10 +21,10 @@ This project implements a multi-agent planning and reinforcement learning enviro
    cd planning-sandbox-library
    ```
 
-2. Create a virtual environment (optional but recommended):
+2. Create a virtual environment using [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/) (optional but recommended):
    ```sh
-   python -m venv venv
-   source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+   mkvirtualenv my-planning-environment
+   workon my-planning-environment
    ```
 
 3. Install the required packages:
