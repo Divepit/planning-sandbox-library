@@ -27,7 +27,7 @@ This project implements a multi-agent planning and reinforcement learning enviro
    workon my-planning-environment
    ```
 
-3. Install the required packages:
+3. Install the package:
    ```sh
    pip install -e .
    ```
