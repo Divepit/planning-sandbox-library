@@ -12,7 +12,7 @@ num_skills = 2
 size = 100
 use_geo_data = True
 
-num_samples = 1000  # Number of samples to generate in this run
+num_samples = 1000000  # Number of samples to generate in this run
 
 # Placeholder functions for data generation
 # def generate_input(env: Environment):
