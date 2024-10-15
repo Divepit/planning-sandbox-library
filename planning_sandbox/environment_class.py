@@ -478,7 +478,7 @@ class Environment:
 
         for i,agent_combination in enumerate(agent_combination_vector):
             for j,goal_permutation in enumerate(goal_permutation_vector):
-                if all([goal_permutation[0] in agent.paths_and_costs_to_goals.keys() for agent in agent_combination]) and all([self.agent_combination_has_required_skills_for_goal(agent_combination, goal) for goal in goal_permutation]):
+                if all([goal_permutation[0] in agent.paths_and_costs_to_goals.keys() for agent in agent_combination]) and all([self.scheduler.agent_combination_has_required_skills_for_goal(agent_combination, goal) for goal in goal_permutation]):
                     agent_combination_goal_permutation_matrix[i,j] = np.sum([self._calculate_cost_of_chain(agent, goal_permutation) for agent in agent_combination])
                 else:
                     agent_combination_goal_permutation_matrix[i,j] = np.inf
