@@ -157,15 +157,6 @@ my_environment.solve_full_solution()
 
 but it will simply show you everything that happens on the map.
 
-## Customization
-
-You can customize various parameters of the environment and training process by modifying the respective scripts. Key parameters include:
-
-- Number of agents
-- Number of goals
-- Grid size
-- Number of skills
-
 ## Contributing
 
 Contributions to this project are welcome! Please follow these steps:
