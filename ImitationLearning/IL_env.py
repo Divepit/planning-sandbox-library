@@ -77,7 +77,7 @@ class ILEnv(gym.Env):
             self.sandboxEnv.full_solution[agent] = [self.sandboxEnv.goals[goal] for goal in valid_goals]
             distributed_goals += len(valid_goals)
         
-        total_cost = self.sandboxEnv._calculate_cost_of_closed_solution(self.sandboxEnv.full_solution, max_cost=np.inf)
+        total_cost = self.sandboxEnv.calculate_cost_of_closed_solution(self.sandboxEnv.full_solution, max_cost=np.inf)
         self.sandboxEnv.solve_full_solution(fast=True)
         all_goals_claimed = self.sandboxEnv.scheduler.all_goals_claimed()
 

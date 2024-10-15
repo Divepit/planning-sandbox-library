@@ -36,7 +36,7 @@ while True:
     action, _ = model.predict(obs, deterministic=True)
 
     predicted_full_solution = learning_sandbox_env.get_full_solution_from_action_vector(action)
-    predicted_full_solution_cost = learning_sandbox_env._calculate_cost_of_closed_solution(predicted_full_solution)
+    predicted_full_solution_cost = learning_sandbox_env.calculate_cost_of_closed_solution(predicted_full_solution)
     learning_sandbox_env.full_solution = predicted_full_solution
     learning_sandbox_env.solve_full_solution()
     if not learning_sandbox_env.deadlocked:
@@ -47,7 +47,7 @@ while True:
 
 
     optimal_solution = optimalEnv.find_numerical_solution(solve_type='optimal')
-    optimal_solution_cost = optimalEnv._calculate_cost_of_closed_solution(optimal_solution)
+    optimal_solution_cost = optimalEnv.calculate_cost_of_closed_solution(optimal_solution)
     vis = Visualizer(optimalEnv)
     vis.visualise_full_solution()
 
