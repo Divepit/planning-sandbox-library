@@ -50,8 +50,9 @@ This project implements a multi-agent planning and reinforcement learning enviro
   - `IL_replay.py`: Continuous replay of latest autosave of trained model
   - `IL_data_collection.py`: Continuous generation of optimal/expert solutions for Imitation Learning
   - `IL_behavioural_cloning.py`: (WIP) Actual imitation learning implementation
-- `BruteForce/`: Numerical Solving / Combinatorially Solving the Problem
-  - `numerical_solving.py`: Example script to use the above tools for algorithm comparison.
+- `Examples/`: Numerical Solving / Combinatorially Solving the Problem
+  - `benchmarking_numerical.py`: Example script to use the above tools for algorithm comparison.
+  - `simple_numerical.py`: Example script to test and demonstrate features.
 
 ## Usage
 
