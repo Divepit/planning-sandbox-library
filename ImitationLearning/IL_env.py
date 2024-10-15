@@ -16,7 +16,8 @@ class ILEnv(gym.Env):
         super(ILEnv, self).__init__()
         self.render_mode = render_mode
         self.sandboxEnv: Environment = sandboxEnv
-        self.max_episode_attempts = 150
+        self.max_episode_attempts = 200
+        self.success_threshold = 0.95
         
 
         self.step_count = 0
@@ -27,6 +28,8 @@ class ILEnv(gym.Env):
         self.episode_cost = 0
         self.episode_deadlocks = 0
         self.episode_unclaimed_goals = 0
+        self.optimal_solution, self.optimal_cost = self.sandboxEnv.find_numerical_solution(solve_type="optimal")
+
 
 
         self.action_space = gym.spaces.MultiDiscrete(
@@ -40,8 +43,8 @@ class ILEnv(gym.Env):
             {   
                 "claimed_goals": Box(low=0, high=1, shape=(len(self.sandboxEnv.goals),), dtype=np.int16),
                 "map_elevations": Box(low=-1, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.float32),
-                "goal_positions": Box(low=0, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.int16),
-                "agent_positions": Box(low=0, high=1, shape=(self.sandboxEnv.size * self.sandboxEnv.size,), dtype=np.int16),
+                "goal_positions": Box(low=0, high=1, shape=(len(self.sandboxEnv.goals)*2,), dtype=np.float32),
+                "agent_positions": Box(low=0, high=1, shape=(len(self.sandboxEnv.agents)*2,), dtype=np.float32),
                 "goal_required_skills": MultiDiscrete(
                 nvec=[2]*self.sandboxEnv.num_skills*len(self.sandboxEnv.goals),
                 start=[0]*self.sandboxEnv.num_skills*len(self.sandboxEnv.goals),
@@ -61,6 +64,7 @@ class ILEnv(gym.Env):
         self.sandboxEnv.soft_reset()
         reward = 0
         distributed_goals = 0
+        done = False
 
         logging.debug("New Step")
         logging.debug("Action: {}".format(action))
@@ -77,31 +81,35 @@ class ILEnv(gym.Env):
             self.sandboxEnv.full_solution[agent] = [self.sandboxEnv.goals[goal] for goal in valid_goals]
             distributed_goals += len(valid_goals)
         
-        total_cost = self.sandboxEnv.calculate_cost_of_closed_solution(self.sandboxEnv.full_solution, max_cost=np.inf)
-        self.sandboxEnv.solve_full_solution(fast=True)
-        all_goals_claimed = self.sandboxEnv.scheduler.all_goals_claimed()
+        total_cost = self.sandboxEnv.solve_full_solution()[2]
+        reward = self.optimal_cost - total_cost
+
+        unclaimed_goals = len(self.sandboxEnv.scheduler.unclaimed_goals)
+        reward -= unclaimed_goals * 300
+
+        close_to_optimal = (self.optimal_cost == total_cost)
+        too_many_attempts = (self.episode_attempts >= self.max_episode_attempts)
+
+        if close_to_optimal:
+            reward += 500
+            done = True
+
+        if too_many_attempts:
+            reward -= 200
+            done = True
 
 
-
-
-
-        reward -= total_cost/len(self.sandboxEnv.agents)
-
-        if not all_goals_claimed or self.sandboxEnv.deadlocked:
-            reward -= 100*len(self.sandboxEnv.scheduler.unclaimed_goals)
 
         self.episode_reward += reward
         self.episode_distributed_goals += distributed_goals
         self.episode_cost += total_cost
         self.episode_deadlocks += int(self.sandboxEnv.deadlocked)
-        self.episode_unclaimed_goals += len(self.sandboxEnv.scheduler.unclaimed_goals)
+        self.episode_unclaimed_goals += unclaimed_goals
 
         logging.debug("Reward: {}".format(reward))
         logging.debug("Total Cost: {}".format(total_cost))
         logging.debug("Unclaimed Goals: {}".format(len(self.sandboxEnv.scheduler.unclaimed_goals)))
 
-
-        done = self.episode_attempts >= self.max_episode_attempts
 
         if done:
             info = {"episode": {"r": self.episode_reward/self.episode_attempts, "l": self.episode_attempts,"distributed_goals": self.episode_distributed_goals/self.episode_attempts, "cost": self.episode_cost/self.episode_attempts, "unclaimed_goals": self.episode_unclaimed_goals/self.episode_attempts, "episode_attempts": self.episode_attempts, "deadlocks": self.episode_deadlocks/self.episode_attempts}}
@@ -123,6 +131,7 @@ class ILEnv(gym.Env):
         self.step_count = 0
         self.episode_deadlocks = 0
         self.sandboxEnv.reset()
+        self.optimal_solution, self.optimal_cost = self.sandboxEnv.find_numerical_solution(solve_type="optimal")
         self.episode_unclaimed_goals = 0
         return self.sandboxEnv.get_observation_vector(), {}
     

@@ -228,21 +228,25 @@ class Environment:
         if solve_type is not None:
             self.solve_type = solve_type
         if self.solve_type == "optimal":
+            cost = 0
             self.replan_on_goal_claim = False
-            self.full_solution = self.find_optimal_solution()
+            self.full_solution, cost = self.find_optimal_solution()
         elif self.solve_type == "fast":
             self.replan_on_goal_claim = True
+            cost = 0
             if self.full_solution is None:
                 self.full_solution = {}
-            intermediate_solution = self.scheduler.find_fast_solution()
+            intermediate_solution, intermediate_cost = self.scheduler.find_fast_solution()
+            cost += intermediate_cost
             for agent in intermediate_solution:
                 if agent not in self.full_solution:
                     self.full_solution[agent] = []
                 self.full_solution[agent].extend(intermediate_solution[agent])
         elif self.solve_type == "linalg":
+            cost = 0
             self.replan_on_goal_claim = False
-            self.full_solution = self.find_linalg_solution()
-        return self.full_solution
+            self.full_solution, cost = self.find_linalg_solution()
+        return self.full_solution, cost
 
     def step_environment(self, fast=False):
         logging.debug("Stepping environment")
@@ -274,12 +278,20 @@ class Environment:
         return total_steps, steps_waited, total_cost, solve_time, amount_of_claimed_goals
     
     def get_observation_vector(self):
-        goals_map = np.zeros((self.size, self.size), dtype=np.int16)
+        goals_map = []
+        # goals_map = np.zeros((self.size, self.size), dtype=np.int16)
         for goal in self.goals:
-            goals_map[goal.position[0], goal.position[1]] = 1
-        agents_map = np.zeros((self.size, self.size), dtype=np.int16)
+            goals_map.append(goal.position[0]/self.size)
+            goals_map.append(goal.position[1]/self.size)
+        goals_map = np.array(goals_map, dtype=np.float32)
+            # goals_map[goal.position[0], goal.position[1]] = 1
+        # agents_map = np.zeros((self.size, self.size), dtype=np.int16)
+        agents_map = []
         for agent in self.agents:
-            agents_map[agent.position[0], agent.position[1]] = 1
+            agents_map.append(agent.position[0]/self.size)
+            agents_map.append(agent.position[1]/self.size)
+            # agents_map[agent.position[0], agent.position[1]] = 1
+        agents_map = np.array(agents_map, dtype=np.float32)
 
         flattened_map = self.grid_map.downscaled_data.flatten()
         min_value = np.min(flattened_map)
@@ -291,8 +303,8 @@ class Environment:
             
             "claimed_goals": np.array([1 if goal.claimed else 0 for goal in self.goals], dtype=np.int16),
             "map_elevations": normalized_map.astype(np.float32),
-            "goal_positions": goals_map.flatten(),
-            "agent_positions": agents_map.flatten(),
+            "goal_positions": goals_map,
+            "agent_positions": agents_map,
             "goal_required_skills": np.array([[(1 if skill in goal.required_skills else 0) for skill in range(self.num_skills)] 
             for goal in self.goals], dtype=np.int16).flatten(),
             "agent_skills": np.array([[(1 if skill in agent.skills else 0) for skill in range(self.num_skills)] 
@@ -449,7 +461,7 @@ class Environment:
                 if full_solution is None or proposed_solution_cost < cheapest_cost:
                     full_solution = proposed_solution
                     cheapest_cost = proposed_solution_cost
-        return full_solution
+        return full_solution, cheapest_cost
     
     def find_linalg_solution(self):
         assert self.agents_goals_connected, "Environment not initialised"
@@ -483,6 +495,7 @@ class Environment:
             goal_permutation = goal_permutation_vector[c]
             if any([goal in covered_goals for goal in goal_permutation]):
                 continue
+            cost = agent_combination_goal_permutation_matrix[r,c]
             for agent in agent_combination:
                 busy_agents.add(agent)
                 if agent not in solution:
@@ -492,4 +505,4 @@ class Environment:
                 covered_goals.add(goal)
             if len(covered_goals) == len(self.scheduler.unclaimed_goals):
                 break
-        return solution
+        return solution, cost

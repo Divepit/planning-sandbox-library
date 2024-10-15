@@ -14,7 +14,7 @@ from IL_env import ILEnv
 from planning_sandbox.environment_class import Environment
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda" if torch.cuda.is_available() else "mps"
 
 def make_env(rank, template_env, seed=0):
     logging.info(f"Creating environment {rank+1}")
@@ -72,12 +72,12 @@ def main():
     norm_env = VecNormalize(subproc_env, norm_obs=False, norm_obs_keys=["map_elevations"])
 
     policy_kwargs = dict(activation_fn=torch.nn.ReLU,
-                     net_arch=[512,512,256,256])
+                     net_arch=[64,64])
 
     model = A2C(
         "MultiInputPolicy",
         norm_env,
-        n_steps=n_envs*150,
+        n_steps=200,
         verbose=1,
         tensorboard_log=dir_path+"/tensorboard_logs/",
         device=device,
