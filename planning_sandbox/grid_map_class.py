@@ -43,12 +43,15 @@ class GridMap:
 
         self.paths = {}
         
-        if self.use_geo_data:
+        if self.use_geo_data and not self.flat_map_for_testing:
             self.data = self._extract_data_from_tif()
             self.downscaled_data, self.pixel_size = self._downscale_data()
-            self._create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=uphill_factor, downhill_slope_max=downhill_slope_max, uphill_slope_max=uphill_slope_max)
         else:
-            self._generate_connected_grid()
+            self.data = np.zeros((size, size))
+            self.downscaled_data = self.data
+            self.pixel_size = MPP
+        
+        self._create_directed_graph(data=self.downscaled_data, pixel_size=self.pixel_size, uphill_factor=uphill_factor, downhill_slope_max=downhill_slope_max, uphill_slope_max=uphill_slope_max)
 
     def _random_position(self):
         return (np.random.randint(0, self.size), np.random.randint(0, self.size))
@@ -132,8 +135,6 @@ class GridMap:
         np.set_printoptions(linewidth=100000)
         height, width = data.shape
         G = nx.DiGraph()
-        if self.flat_map_for_testing:
-            data = np.zeros((height, width))
         for i in range(height):
             for j in range(width):
                 node = (i, j)
@@ -192,7 +193,7 @@ class GridMap:
         elif self.use_geo_data:
             return nx.path_weight(self.graph, path, weight="weight")
         else:
-            return nx.path_weight(self.graph, path)
+            return nx.path_weight(self.graph, path, weight="weight")
     
     def reset(self):
         self.paths.clear()

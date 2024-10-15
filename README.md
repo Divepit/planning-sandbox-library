@@ -16,23 +16,21 @@ This project implements a multi-agent planning and reinforcement learning enviro
 ## Installation
 
 1. Clone the repository:
-   ```
+   ```sh
    git clone git@github.com:Divepit/planning-sandbox-library.git
    cd planning-sandbox-library
    ```
 
 2. Create a virtual environment (optional but recommended):
-   ```
+   ```sh
    python -m venv venv
    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
    ```
 
 3. Install the required packages:
+   ```sh
+   pip install -e .
    ```
-   pip install -r requirements.txt
-   ```
-
-   Note: If you're using GPU acceleration, you may need to install PyTorch separately. Please refer to the [PyTorch installation guide](https://pytorch.org/get-started/locally/) for instructions specific to your system.
 
 ## Project Structure
 
@@ -57,13 +55,17 @@ This project implements a multi-agent planning and reinforcement learning enviro
 
 ## Usage
 
+I suggest you use the script under `Examples/simple_numerical.py` to follow the coming steps. The script is more or less analog to what is described below and you can test the differences visually like that.
+
 ### Create a new environment
 
 When creating the environment, we define the grid size (only square grids size x size), the number of agents and the number of goals as well as the number of skills in the game. The environment will randomly distribute skills between agents and goals but it will ensure that the problem is solvable.
 
 ```python
-my_environment = Environment(size=200, num_agents=3, num_goals=5, num_skills=2)
+my_environment = Environment(size=200, num_agents=3, num_goals=5, num_skills=2, use_geo_data=True)
 ```
+
+Note that the `use_geo_data` input determines whether an elevation map will be used or not. If we set this to false, we will be working with a flat, empty map with no obstacles and the weight of the travelled paths will just be the sum of the steps taken to pass from starting positions to goal.
    
 ### Solve numerically
 
@@ -135,7 +137,7 @@ The cost of the solution is calculated using the slope of the terrain as well as
 There are two reset options:
 
 - `my_environment.soft_reset()`: Simply resets agents to their initial positions and clears all running variables. With this you can reuse the same environment with the same starting conditions and the same agents, goals and skills and start from scratch. This can be used to compare multiple algorithms on the same environment.
-- `my_environment.reset(): Deletes all agents and goals and sets up a completely new problem. This is still faster than making a new environment since the base map and graph does not have to be regenerated.
+- `my_environment.reset()`: Deletes all agents and goals and sets up a completely new problem. This is still faster than making a new environment since the base map and graph does not have to be regenerated.
 
 ### Visualisation
 
