@@ -1,16 +1,12 @@
-
 class Agent:
     def __init__(self, initial_position):
         self.initial_position = initial_position
         self.position = initial_position
         self.skills = []
-
-    def reset(self, position=None):
-        if position is not None:
-            self.position = position
-        else:
-            self.position = self.initial_position
-        self.skills.clear()
+        self.paths_and_costs_to_goals = {}
+        self.steps_moved = 0
+        self.steps_waited = 0
+        self.accumulated_cost = 0
 
     def _move_left(self):
         self.position = (self.position[0] - 1, self.position[1])
@@ -30,7 +26,25 @@ class Agent:
     def move_to_position(self, position):
         self.position = position
 
-    def apply_action(self, action):
+    def reset(self, position=None):
+        if position is not None:
+            self.position = position
+            self.initial_position = position
+        else:
+            self.position = self.initial_position
+        self.skills.clear()
+        self.paths_and_costs_to_goals.clear()
+        self.steps_moved = 0
+        self.steps_waited = 0
+        self.accumulated_cost = 0
+
+    def soft_reset(self):
+        self.position = self.initial_position
+        self.steps_moved = 0
+        self.steps_waited = 0
+        self.accumulated_cost = 0
+
+    def apply_action(self, action, action_cost):
         if action == 1 or action == 'left':
             self._move_left()
         elif action == 2 or action == 'right':
@@ -44,7 +58,18 @@ class Agent:
         else:
             raise ValueError("Invalid action: " + str(action))
         
+        if action == 'stay':
+            self.steps_waited += 1
+        else:
+            self.steps_moved += 1
         
+        self.accumulated_cost += action_cost
     
     def add_skill(self, skill):
         self.skills.append(skill)
+
+    def add_path_to_goal(self, goal, path, cost):
+        self.paths_and_costs_to_goals[goal] = (path, cost)
+
+
+            

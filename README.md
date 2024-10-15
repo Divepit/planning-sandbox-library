@@ -6,7 +6,7 @@ This project implements a multi-agent planning and reinforcement learning enviro
 
 ## Features
 
-- Custom grid-based environment with agents, goals, and obstacles
+- Custom grid-based environment with agents, goals
 - Support for multi-agent scenarios with skill-based task allocation
 - Reinforcement Learning (RL) implementation using Proximal Policy Optimization (PPO)
 - Numerical solving for optimal solutions
@@ -40,10 +40,8 @@ This project implements a multi-agent planning and reinforcement learning enviro
   - `environment_class.py`: Main environment implementation
   - `agent_class.py`: Agent implementation
   - `goal_class.py`: Goal implementation
-  - `grid_map_class.py`: Grid map and obstacle handling
-  - `controller_class.py`: Action controller
+  - `grid_map_class.py`: Grid map
   - `scheduler_class.py`: Task scheduling
-  - `planner_class.py`: Path planning
   - `visualiser_class.py`: Environment visualization
 - `RL/`: Reinforcement Learning implementation
   - `RL_mover_env.py`: RL environment wrapper
@@ -107,7 +105,6 @@ You can customize various parameters of the environment and training process by 
 - Number of goals
 - Grid size
 - Number of skills
-- Number of obstacles
 - Training hyperparameters (in `train_RL.py` and `train_GPU.py`)
 
 ## Contributing
