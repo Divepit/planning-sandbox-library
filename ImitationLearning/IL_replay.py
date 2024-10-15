@@ -1,9 +1,7 @@
-import sys
 import os
 import glob
 import logging
 import copy
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 

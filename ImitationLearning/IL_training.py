@@ -1,10 +1,7 @@
-import sys
 import os
 import logging
 import copy
 import torch
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 from stable_baselines3.common.env_checker import check_env

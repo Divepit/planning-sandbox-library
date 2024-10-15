@@ -2,11 +2,11 @@ from planning_sandbox.environment_class import Environment
 from planning_sandbox.visualizer_class import Visualizer
 
 num_agents = 3
-num_goals = 7
+num_goals = 5
 num_skills = 2
 size = 100
 visualisation_speed = 100 # Max 200
-solve_type = 'fast'
+solve_type = 'optimal' # 'optimal' or 'fast'
 use_map = True
 
 my_environment = Environment(size=size, num_agents=num_agents, num_goals=num_goals, num_skills=num_skills, use_geo_data=use_map)
