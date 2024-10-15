@@ -61,6 +61,7 @@ def main():
         action_space=training_env.action_space,
         demonstrations=trajectories,
         rng=np.random.default_rng(),
+        batch_size=1,
     )
 
     bc_trainer.train(n_epochs=1077)

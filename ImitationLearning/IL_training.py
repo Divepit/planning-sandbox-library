@@ -77,7 +77,7 @@ def main():
     model = A2C(
         "MultiInputPolicy",
         norm_env,
-        n_steps=25,
+        n_steps=n_envs*150,
         verbose=1,
         tensorboard_log=dir_path+"/tensorboard_logs/",
         device=device,
