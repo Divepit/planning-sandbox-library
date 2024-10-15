@@ -4,7 +4,7 @@ with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
 setup(
-    name='planning_sandbox',             # Name of your project/library
+    name='planning-sandbox',             # Name of your project/library
     version='0.1',                 # Version
     packages=find_packages(),      # Automatically find packages in your project
     install_requires=requirements,
