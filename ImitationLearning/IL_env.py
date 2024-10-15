@@ -3,7 +3,7 @@ import copy
 import numpy as np
 import logging
 
-from gymnasium.spaces import Dict, MultiDiscrete, Discrete, Box
+from gymnasium.spaces import Dict, MultiDiscrete, Discrete, Box, MultiBinary
 
 from planning_sandbox.environment_class import Environment
 from planning_sandbox.visualizer_class import Visualizer
@@ -34,6 +34,7 @@ class ILEnv(gym.Env):
             start=[0]*len(self.sandboxEnv.agents)*len(self.sandboxEnv.goals),
             dtype=np.int64
         )
+
         
         self.observation_space = Dict(
             {   
@@ -76,7 +77,7 @@ class ILEnv(gym.Env):
             self.sandboxEnv.full_solution[agent] = [self.sandboxEnv.goals[goal] for goal in valid_goals]
             distributed_goals += len(valid_goals)
         
-        total_cost = self.sandboxEnv._calculate_cost_of_closed_solution(self.sandboxEnv.full_solution, max_cost=np.inf)
+        total_cost = self.sandboxEnv.calculate_cost_of_closed_solution(self.sandboxEnv.full_solution, max_cost=np.inf)
         self.sandboxEnv.solve_full_solution(fast=True)
         all_goals_claimed = self.sandboxEnv.scheduler.all_goals_claimed()
 

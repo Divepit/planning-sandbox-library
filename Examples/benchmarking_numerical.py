@@ -1,8 +1,3 @@
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
 # import cProfile
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,8 +6,9 @@ import logging
 
 from planning_sandbox.environment_class import Environment
 from planning_sandbox.visualizer_class import Visualizer
-from planning_sandbox.agent_class import Agent
 from planning_sandbox.benchmark_class import Benchmark
+
+
 
 from copy import deepcopy
 

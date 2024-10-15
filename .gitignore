@@ -7,3 +7,4 @@ saved_models
 *datasets
 *logs
 *.pkl
+*.egg-info

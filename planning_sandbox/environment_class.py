@@ -12,7 +12,7 @@ from planning_sandbox.benchmark_class import Benchmark
 import numpy as np
 
 class Environment:
-    def __init__(self, size, num_agents, num_goals, num_skills, use_geo_data=False, solve_type="optimal",replan_on_goal_claim=False):
+    def __init__(self, size, num_agents, num_goals, num_skills, use_geo_data=True, solve_type="optimal",replan_on_goal_claim=False):
         self.size = size
         self.map_diagonal = np.sqrt(2 * (size ** 2))
         self.solve_type = solve_type
@@ -389,7 +389,7 @@ class Environment:
         return total_steps, steps_waited, total_cost
 
     
-    def _calculate_cost_of_closed_solution(self, solution: Dict[Agent, List[Goal]], max_cost=np.inf) -> int:
+    def calculate_cost_of_closed_solution(self, solution: Dict[Agent, List[Goal]], max_cost=np.inf) -> int:
         solution_cost = 0
         for agent, goals in solution.items():
             cost, _ = self._calculate_cost_of_chain(agent, goals)
@@ -445,7 +445,7 @@ class Environment:
                         if agent not in proposed_solution:
                             proposed_solution[agent] = []
                         proposed_solution[agent].append(goal)
-                    proposed_solution_cost = self._calculate_cost_of_closed_solution(solution=proposed_solution, max_cost=cheapest_cost)
+                    proposed_solution_cost = self.calculate_cost_of_closed_solution(solution=proposed_solution, max_cost=cheapest_cost)
                 if full_solution is None or proposed_solution_cost < cheapest_cost:
                     full_solution = proposed_solution
                     cheapest_cost = proposed_solution_cost
